@@ -1,0 +1,100 @@
+
+{% extends "base.html" %}
+
+{% block title %}Food Waste | SchoolFeeding360{% endblock %}
+{% block page_heading %}Food Waste Management{% endblock %}
+
+{% block content %}
+<div class="page-intro">
+    <div>
+        <h2>Record Food Waste</h2>
+        <p>Track wasted food, identify reasons and support waste-reduction decisions.</p>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-heading">
+        <h2>Add Waste Record</h2>
+    </div>
+
+    <form method="POST" action="/waste" class="form-grid">
+        <div>
+            <label for="food_name">Food item *</label>
+            <input id="food_name" name="food_name" required>
+        </div>
+
+        <div>
+            <label for="quantity">Quantity wasted *</label>
+            <input id="quantity" name="quantity" type="number" min="0.01" step="0.01" required>
+        </div>
+
+        <div>
+            <label for="unit">Unit *</label>
+            <input id="unit" name="unit" placeholder="kg, litres, portions..." required>
+        </div>
+
+        <div>
+            <label for="waste_date">Date *</label>
+            <input id="waste_date" name="waste_date" type="date" required>
+        </div>
+
+        <div class="full-width">
+            <label for="reason">Reason for waste *</label>
+            <select id="reason" name="reason" required>
+                <option value="">Select a reason</option>
+                <option value="Expired">Expired</option>
+                <option value="Overproduction">Overproduction</option>
+                <option value="Preparation waste">Preparation waste</option>
+                <option value="Spoilage">Spoilage</option>
+                <option value="Leftovers">Uneaten food / leftovers</option>
+                <option value="Damaged">Damaged food</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+
+        <div class="form-actions">
+            <button class="button" type="submit">Save Waste Record</button>
+        </div>
+    </form>
+</div>
+
+<div class="panel">
+    <div class="panel-heading">
+        <h2>Waste History</h2>
+        <span class="count-badge">{{ records|length }} records</span>
+    </div>
+
+    {% if records %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Food item</th>
+                    <th>Quantity</th>
+                    <th>Reason</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    <td><strong>{{ record.food_name }}</strong></td>
+                    <td>{{ record.quantity }} {{ record.unit }}</td>
+                    <td>{{ record.reason }}</td>
+                    <td>{{ record.waste_date }}</td>
+                    <td>
+                        <form method="POST" action="/waste/delete/{{ record.id }}" onsubmit="return confirm('Delete this waste record?');">
+                            <button type="submit" class="delete-button small">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <p class="empty-cell">No food-waste records have been added yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

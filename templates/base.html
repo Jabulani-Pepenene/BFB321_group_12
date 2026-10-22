@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SchoolFeeding360{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <a class="brand" href="/">SchoolFeeding<span>360</span></a>
+            <p class="nav-label">MAIN MENU</p>
+
+            <nav>
+                <a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a>
+                <a href="/inventory" class="{% if request.path.startswith('/inventory') %}active{% endif %}">Inventory</a>
+                <a href="/suppliers" class="{% if request.path.startswith('/suppliers') %}active{% endif %}">Suppliers</a>
+                <a href="/meals" class="{% if request.path.startswith('/meals') %}active{% endif %}">Meal Planning</a>
+                <a href="/waste" class="{% if request.path.startswith('/waste') %}active{% endif %}">Food Waste</a>
+            </nav>
+
+            <div class="sidebar-footer">
+                School food management<br>
+                <span>Manage • Monitor • Improve</span>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">SCHOOL FEEDING MANAGEMENT</p>
+                    <h1>{% block page_heading %}Dashboard{% endblock %}</h1>
+                </div>
+                <div class="topbar-label">SchoolFeeding360</div>
+            </header>
+
+            <section class="content">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </section>
+        </main>
+    </div>
+</body>
+</html>

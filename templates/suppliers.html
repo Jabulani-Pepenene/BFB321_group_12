@@ -1,0 +1,93 @@
+
+{% extends "base.html" %}
+
+{% block title %}Suppliers | SchoolFeeding360{% endblock %}
+{% block page_heading %}Supplier Management{% endblock %}
+
+{% block content %}
+<div class="page-intro">
+    <div>
+        <h2>Food Suppliers</h2>
+        <p>Maintain supplier contacts and track which food products they provide.</p>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-heading">
+        <h2>Add Supplier</h2>
+    </div>
+
+    <form method="POST" action="/suppliers" class="form-grid">
+        <div>
+            <label for="name">Supplier name *</label>
+            <input id="name" name="name" required>
+        </div>
+
+        <div>
+            <label for="contact_person">Contact person</label>
+            <input id="contact_person" name="contact_person">
+        </div>
+
+        <div>
+            <label for="phone">Phone number</label>
+            <input id="phone" name="phone" type="tel">
+        </div>
+
+        <div>
+            <label for="email">Email address</label>
+            <input id="email" name="email" type="email">
+        </div>
+
+        <div class="full-width">
+            <label for="food_supplied">Food supplied</label>
+            <textarea id="food_supplied" name="food_supplied" rows="3" placeholder="e.g. Rice, beans, vegetables"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button class="button" type="submit">Add Supplier</button>
+        </div>
+    </form>
+</div>
+
+<div class="panel">
+    <div class="panel-heading">
+        <h2>Registered Suppliers</h2>
+        <span class="count-badge">{{ suppliers|length }} suppliers</span>
+    </div>
+
+    {% if suppliers %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Supplier</th>
+                    <th>Contact person</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Food supplied</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for supplier in suppliers %}
+                <tr>
+                    <td><strong>{{ supplier.name }}</strong></td>
+                    <td>{{ supplier.contact_person or '—' }}</td>
+                    <td>{{ supplier.phone or '—' }}</td>
+                    <td>{{ supplier.email or '—' }}</td>
+                    <td>{{ supplier.food_supplied or '—' }}</td>
+                    <td>
+                        <form method="POST" action="/suppliers/delete/{{ supplier.id }}" onsubmit="return confirm('Delete this supplier? Inventory records will no longer be linked to this supplier.');">
+                            <button type="submit" class="delete-button small">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <p class="empty-cell">No suppliers registered yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

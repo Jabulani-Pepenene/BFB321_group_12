@@ -1,0 +1,222 @@
+
+{% extends "base.html" %}
+{% block title %}Meal Planning | SchoolFeeding360{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">MENU MANAGEMENT</p>
+        <h1>Meal Planning</h1>
+        <p class="muted">
+            Plan meals, calculate ingredient requirements and monitor available stock.
+        </p>
+    </div>
+</div>
+
+<section class="panel form-panel">
+    <h2>Plan a meal</h2>
+
+    <form method="POST" class="form-grid">
+        <label>
+            Meal name *
+            <input name="meal_name" required maxlength="100"
+                   placeholder="e.g. Rice and beans">
+        </label>
+
+        <label>
+            Meal date *
+            <input type="date" name="meal_date"
+                   min="{{ today }}" required>
+        </label>
+
+        <label>
+            Number of servings *
+            <input type="number" name="servings"
+                   min="1" value="100" required>
+        </label>
+
+        <label>
+            Description
+            <input name="description" placeholder="Meal notes">
+        </label>
+
+        <button type="submit" class="button">Save meal plan</button>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-heading">
+        <h2>Scheduled meals</h2>
+        <span class="count-badge">{{ meals|length }} plans</span>
+    </div>
+
+    {% for meal in meals %}
+    <div class="panel" style="margin-bottom: 20px;">
+        <div class="panel-heading">
+            <div>
+                <h2>{{ meal.meal_name }}</h2>
+                <p class="muted">
+                    Date: {{ meal.meal_date }} |
+                    Servings: {{ meal.servings }}
+                </p>
+
+                {% if meal.description %}
+                    <p>{{ meal.description }}</p>
+                {% endif %}
+            </div>
+
+            {% if meal.status == "Served" %}
+                <span class="count-badge">Served</span>
+            {% else %}
+                <span class="count-badge">Planned</span>
+            {% endif %}
+        </div>
+
+        {% if meal.ingredients and not meal.has_sufficient_stock %}
+            <p class="flash error">
+                Stock shortage: one or more ingredients are not available
+                in the quantities required.
+            </p>
+        {% endif %}
+
+        <h3>Ingredients required</h3>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ingredient</th>
+                        <th>Per serving</th>
+                        <th>Total required</th>
+                        <th>Stock available</th>
+                        <th>Stock check</th>
+                        {% if meal.status != "Served" %}
+                            <th>Action</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+
+                <tbody>
+                {% for ingredient in meal.ingredients %}
+                    <tr>
+                        <td>{{ ingredient.item_name }}</td>
+
+                        <td>
+                            {{ ingredient.quantity_per_serving }}
+                            {{ ingredient.unit }}
+                        </td>
+
+                        <td>
+                            {{ "%.3f"|format(ingredient.total_required|float) }}
+                            {{ ingredient.unit }}
+                        </td>
+
+                        <td>
+                            {{ ingredient.stock_available }}
+                            {{ ingredient.unit }}
+                        </td>
+
+                        <td>
+                            {% if ingredient.sufficient %}
+                                <span class="count-badge">Sufficient</span>
+                            {% else %}
+                                <span class="count-badge">Shortage</span>
+                            {% endif %}
+                        </td>
+
+                        {% if meal.status != "Served" %}
+                        <td>
+                            <form method="POST"
+                                  action="{{ url_for('delete_meal_ingredient', ingredient_id=ingredient.ingredient_id) }}"
+                                  onsubmit="return confirm('Remove this ingredient?')">
+                                <button type="submit" class="delete-button">
+                                    Remove
+                                </button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="{{ 6 if meal.status != 'Served' else 5 }}"
+                            class="empty-cell">
+                            No ingredients added yet.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if meal.status != "Served" %}
+        <h3>Add or update an ingredient</h3>
+
+        {% if inventory_items %}
+        <form method="POST"
+              action="{{ url_for('add_meal_ingredient', meal_id=meal.id) }}"
+              class="form-grid">
+
+            <label>
+                Inventory item *
+                <select name="inventory_id" required>
+                    <option value="">Choose an ingredient</option>
+                    {% for item in inventory_items %}
+                    <option value="{{ item.id }}">
+                        {{ item.item_name }}
+                        (stock: {{ item.quantity }} {{ item.unit }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label>
+                Quantity per serving *
+                <input type="number" name="quantity_per_serving"
+                       min="0.001" step="0.001" required
+                       placeholder="e.g. 0.150">
+                <small class="muted">
+                    Use the same unit as the inventory item.
+                </small>
+            </label>
+
+            <button type="submit" class="button">
+                Save ingredient
+            </button>
+        </form>
+        {% else %}
+            <p class="muted">
+                Add ingredients to Inventory before creating ingredient lists.
+            </p>
+        {% endif %}
+
+        <div style="margin-top: 16px;">
+            <form method="POST"
+                  action="{{ url_for('serve_meal', meal_id=meal.id) }}"
+                  onsubmit="return confirm('Confirm that this meal was served and deduct its ingredients from inventory?')">
+
+                <button type="submit" class="button"
+                        {% if not meal.has_ingredients or not meal.has_sufficient_stock %}disabled{% endif %}>
+                    Mark as served and deduct stock
+                </button>
+            </form>
+
+            <p class="muted">
+                Stock is deducted only when you confirm serving.
+                All ingredient quantities are checked first.
+            </p>
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('delete_meal', meal_id=meal.id) }}"
+              onsubmit="return confirm('Delete this meal plan and its ingredients?')">
+            <button type="submit" class="delete-button">
+                Delete meal plan
+            </button>
+        </form>
+        {% endif %}
+    </div>
+    {% else %}
+        <p class="empty-cell">No meal plans yet. Add your first meal above.</p>
+    {% endfor %}
+</section>
+{% endblock %}

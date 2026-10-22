@@ -1,0 +1,353 @@
+
+{% extends "base.html" %}
+
+{% block title %}Inventory | SchoolFeeding360{% endblock %}
+{% block page_heading %}Inventory Management{% endblock %}
+
+{% block content %}
+
+<div class="page-intro">
+    <div>
+        <h2>Food Inventory</h2>
+        <p>Manage food supplies, stock levels, expiry dates and replenishment.</p>
+    </div>
+</div>
+
+<!-- ADD INVENTORY ITEM -->
+<div class="panel">
+    <div class="panel-heading">
+        <h2>Add Inventory Item</h2>
+    </div>
+
+    <form method="POST" action="/inventory" class="form-grid">
+
+        <div>
+            <label for="item_name">Item name *</label>
+            <input
+                id="item_name"
+                name="item_name"
+                type="text"
+                placeholder="e.g. Rice"
+                required
+            >
+        </div>
+
+        <div>
+            <label for="category">Category *</label>
+            <select id="category" name="category" required>
+                <option value="">Select a category</option>
+                <option value="Grains and cereals">Grains and cereals</option>
+                <option value="Fruits">Fruits</option>
+                <option value="Vegetables">Vegetables</option>
+                <option value="Meat and poultry">Meat and poultry</option>
+                <option value="Fish and seafood">Fish and seafood</option>
+                <option value="Dairy products">Dairy products</option>
+                <option value="Legumes and beans">Legumes and beans</option>
+                <option value="Cooking oils and fats">Cooking oils and fats</option>
+                <option value="Spices and seasonings">Spices and seasonings</option>
+                <option value="Canned and packaged foods">Canned and packaged foods</option>
+                <option value="Baking ingredients">Baking ingredients</option>
+                <option value="Condiments and sauces">Condiments and sauces</option>
+                <option value="Beverages">Beverages</option>
+                <option value="Snacks">Snacks</option>
+                <option value="Frozen foods">Frozen foods</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="quantity">Opening quantity *</label>
+            <input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 50"
+                required
+            >
+        </div>
+
+        <div>
+            <label for="unit">Unit *</label>
+            <select id="unit" name="unit" required>
+                <option value="">Select a unit</option>
+                <option value="kg">Kilograms (kg)</option>
+                <option value="g">Grams (g)</option>
+                <option value="L">Litres (L)</option>
+                <option value="mL">Millilitres (mL)</option>
+                <option value="Each">Units (each)</option>
+                <option value="Packets">Packets</option>
+                <option value="Bags">Bags</option>
+                <option value="Boxes">Boxes</option>
+                <option value="Cans">Cans</option>
+                <option value="Bottles">Bottles</option>
+                <option value="Tins">Tins</option>
+                <option value="Loaves">Loaves</option>
+                <option value="Trays">Trays</option>
+                <option value="Portions">Portions</option>
+                <option value="Dozens">Dozens</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="minimum_stock">Minimum stock *</label>
+            <input
+                id="minimum_stock"
+                name="minimum_stock"
+                type="number"
+                min="0"
+                step="0.01"
+                value="0"
+                required
+            >
+        </div>
+
+        <div>
+            <label for="expiry_date">Expiry date</label>
+            <input
+                id="expiry_date"
+                name="expiry_date"
+                type="date"
+            >
+        </div>
+
+        <div>
+            <label for="supplier_id">Supplier</label>
+            <select id="supplier_id" name="supplier_id">
+                <option value="">No supplier selected</option>
+                {% for supplier in suppliers %}
+                <option value="{{ supplier.id }}">
+                    {{ supplier.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="button">
+                Add Inventory Item
+            </button>
+        </div>
+
+    </form>
+</div>
+
+<!-- CURRENT INVENTORY -->
+<div class="panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Current Stock</h2>
+            <p>View stock levels and record incoming or outgoing stock.</p>
+        </div>
+
+        <span class="count-badge">
+            {{ items|length }} items
+        </span>
+    </div>
+
+    {% if items %}
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th>Quantity</th>
+                    <th>Minimum Stock</th>
+                    <th>Expiry Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>
+                        <strong>{{ item.item_name }}</strong>
+                    </td>
+
+                    <td>{{ item.category or '—' }}</td>
+
+                    <td>
+                        {{ item.quantity }} {{ item.unit }}
+                    </td>
+
+                    <td>
+                        {{ item.minimum_stock }} {{ item.unit }}
+                    </td>
+
+                    <td>
+                        {{ item.expiry_date or '—' }}
+                    </td>
+
+                    <td>
+                        {% if item.expiry_date and item.expiry_date < today_date %}
+                            <span class="status danger">Expired</span>
+                        {% elif item.quantity <= item.minimum_stock %}
+                            <span class="status danger">Low stock</span>
+                        {% else %}
+                            <span class="status success">Stock available</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <div class="action-stack">
+
+                            <!-- RECEIVE STOCK -->
+                            <form
+                                method="POST"
+                                action="/inventory/receive/{{ item.id }}"
+                                class="inline-form"
+                            >
+                                <input
+                                    type="number"
+                                    name="quantity_received"
+                                    min="0.01"
+                                    step="0.01"
+                                    placeholder="Received qty"
+                                    aria-label="Quantity received for {{ item.item_name }}"
+                                    required
+                                >
+
+                                <button type="submit" class="button small">
+                                    Receive
+                                </button>
+                            </form>
+
+                            <!-- USE STOCK -->
+                            <form
+                                method="POST"
+                                action="/inventory/use/{{ item.id }}"
+                                class="inline-form"
+                            >
+                                <input
+                                    type="number"
+                                    name="quantity_used"
+                                    min="0.01"
+                                    step="0.01"
+                                    placeholder="Used qty"
+                                    aria-label="Quantity used for {{ item.item_name }}"
+                                    required
+                                >
+
+                                <button type="submit" class="button secondary small">
+                                    Use
+                                </button>
+                            </form>
+
+                            <!-- INVENTORY SETTINGS -->
+                            <details>
+                                <summary>EOQ & Reorder Settings</summary>
+
+                                <form
+                                    method="POST"
+                                    action="/inventory/settings/{{ item.id }}"
+                                    class="settings-form"
+                                >
+                                    <label>
+                                        Daily usage
+                                        <input
+                                            type="number"
+                                            name="daily_usage"
+                                            min="0"
+                                            step="0.01"
+                                            value="{{ item.daily_usage or 0 }}"
+                                            required
+                                        >
+                                    </label>
+
+                                    <label>
+                                        Operating days per year
+                                        <input
+                                            type="number"
+                                            name="operating_days"
+                                            min="1"
+                                            max="366"
+                                            value="{{ item.operating_days or 260 }}"
+                                            required
+                                        >
+                                    </label>
+
+                                    <label>
+                                        Lead time (days)
+                                        <input
+                                            type="number"
+                                            name="lead_time_days"
+                                            min="0"
+                                            value="{{ item.lead_time_days or 0 }}"
+                                            required
+                                        >
+                                    </label>
+
+                                    <label>
+                                        Safety stock
+                                        <input
+                                            type="number"
+                                            name="safety_stock"
+                                            min="0"
+                                            step="0.01"
+                                            value="{{ item.safety_stock or 0 }}"
+                                            required
+                                        >
+                                    </label>
+
+                                    <label>
+                                        Ordering cost (R/order)
+                                        <input
+                                            type="number"
+                                            name="ordering_cost"
+                                            min="0"
+                                            step="0.01"
+                                            value="{{ item.ordering_cost or 0 }}"
+                                            required
+                                        >
+                                    </label>
+
+                                    <label>
+                                        Holding cost (R/unit/year)
+                                        <input
+                                            type="number"
+                                            name="holding_cost"
+                                            min="0"
+                                            step="0.01"
+                                            value="{{ item.holding_cost or 0 }}"
+                                            required
+                                        >
+                                    </label>
+
+                                    <button type="submit" class="button small">
+                                        Save Settings
+                                    </button>
+                                </form>
+                            </details>
+
+                            <!-- DELETE ITEM -->
+                            <form
+                                method="POST"
+                                action="/inventory/delete/{{ item.id }}"
+                                onsubmit="return confirm('Are you sure you want to delete this inventory item?');"
+                            >
+                                <button type="submit" class="delete-button small">
+                                    Delete Item
+                                </button>
+                            </form>
+
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% else %}
+        <p class="empty-cell">
+            No inventory items have been added yet. Use the form above to add your first item.
+        </p>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,924 @@
+
+import os
+from datetime import date
+from decimal import Decimal, InvalidOperation
+
+import mysql.connector
+from flask import Flask, render_template, request, redirect, url_for, flash
+
+app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "schoolfeeding360-local-key")
+
+
+# --------------------------------------------------
+# DATABASE CONNECTION
+# --------------------------------------------------
+
+def get_db_connection():
+    return mysql.connector.connect(
+        host=os.getenv("MYSQL_HOST", "localhost"),
+        user=os.getenv("MYSQL_USER", "root"),
+        password=os.getenv("MYSQL_PASSWORD", "Reotshepile@2004"),
+        database=os.getenv("MYSQL_DATABASE", "schoolfeeding360")
+    )
+
+
+def get_cursor(connection):
+    return connection.cursor(dictionary=True)
+
+
+# --------------------------------------------------
+# DATABASE SETUP
+# --------------------------------------------------
+
+def ensure_meal_planning_tables(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS meal_ingredients (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            meal_id INT NOT NULL,
+            inventory_id INT NOT NULL,
+            quantity_per_serving DECIMAL(10,3) NOT NULL,
+            UNIQUE KEY unique_meal_ingredient (meal_id, inventory_id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stock_receipts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            item_id INT NOT NULL,
+            quantity_received DECIMAL(10,2) NOT NULL,
+            supplier_id INT NULL,
+            received_date DATE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("SHOW COLUMNS FROM meal_plans LIKE 'status'")
+    if cursor.fetchone() is None:
+        cursor.execute("""
+            ALTER TABLE meal_plans
+            ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'Planned'
+        """)
+
+
+def to_decimal(value, field_name, minimum=None):
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError(f"Enter a valid number for {field_name}.")
+
+    if not number.is_finite():
+        raise ValueError(f"Enter a valid number for {field_name}.")
+
+    if minimum is not None and number < Decimal(str(minimum)):
+        raise ValueError(f"{field_name} must be at least {minimum}.")
+
+    return number
+
+
+def parse_date(value, field_name, required=False):
+    if not value:
+        if required:
+            raise ValueError(f"{field_name} is required.")
+        return None
+
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"Enter a valid {field_name}.")
+
+
+# --------------------------------------------------
+# DASHBOARD
+# --------------------------------------------------
+
+@app.route("/")
+def index():
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        ensure_meal_planning_tables(cursor)
+        connection.commit()
+
+        cursor.execute("SELECT COUNT(*) AS total FROM inventory")
+        inventory_count = cursor.fetchone()["total"]
+
+        cursor.execute("SELECT COUNT(*) AS total FROM suppliers")
+        supplier_count = cursor.fetchone()["total"]
+
+        cursor.execute("SELECT COUNT(*) AS total FROM meal_plans")
+        meal_count = cursor.fetchone()["total"]
+
+        cursor.execute("SELECT COUNT(*) AS total FROM food_waste")
+        waste_count = cursor.fetchone()["total"]
+
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM inventory
+            WHERE quantity <= minimum_stock
+        """)
+        low_stock_count = cursor.fetchone()["total"]
+
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM meal_plans
+            WHERE meal_date >= %s AND status = 'Planned'
+        """, (date.today(),))
+        upcoming_count = cursor.fetchone()["total"]
+
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM food_waste
+            WHERE waste_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        """)
+        recent_waste_count = cursor.fetchone()["total"]
+
+        # Recent food-waste records for the dashboard
+        cursor.execute("""
+            SELECT *
+            FROM food_waste
+            ORDER BY waste_date DESC, id DESC
+            LIMIT 5
+        """)
+        recent_waste = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT *
+            FROM meal_plans
+            WHERE meal_date >= %s AND status = 'Planned'
+            ORDER BY meal_date ASC
+            LIMIT 5
+        """, (date.today(),))
+        upcoming_meals = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT
+                i.*,
+                (i.daily_usage * i.lead_time_days + i.safety_stock)
+                    AS reorder_point
+            FROM inventory i
+            WHERE
+                i.quantity <= i.minimum_stock
+                OR (
+                    i.expiry_date IS NOT NULL
+                    AND i.expiry_date <=
+                        DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+                )
+            ORDER BY i.expiry_date ASC
+        """)
+        stock_alerts = cursor.fetchall()
+
+        return render_template(
+            "index.html",
+            inventory_count=inventory_count,
+            supplier_count=supplier_count,
+            suppliers_count=supplier_count,
+            meal_count=meal_count,
+            meal_plan_count=meal_count,
+            waste_count=waste_count,
+            low_stock_count=low_stock_count,
+            upcoming_count=upcoming_count,
+            recent_waste_count=recent_waste_count,
+            recent_waste=recent_waste,
+            upcoming_meals=upcoming_meals,
+            stock_alerts=stock_alerts,
+            today_date=date.today(),
+            today=date.today()
+        )
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+# --------------------------------------------------
+# INVENTORY
+# --------------------------------------------------
+
+@app.route("/inventory", methods=["GET", "POST"])
+def inventory():
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        if request.method == "POST":
+            item_name = request.form.get("item_name", "").strip()
+            category = request.form.get("category", "").strip() or None
+            unit = request.form.get("unit", "").strip()
+            supplier_value = request.form.get("supplier_id", "").strip()
+
+            try:
+                quantity = to_decimal(
+                    request.form.get("quantity"), "Opening quantity", 0
+                )
+                minimum_stock = to_decimal(
+                    request.form.get("minimum_stock"), "Minimum stock", 0
+                )
+                expiry_date = parse_date(
+                    request.form.get("expiry_date"), "expiry date"
+                )
+                supplier_id = int(supplier_value) if supplier_value else None
+
+                if not item_name or not unit:
+                    raise ValueError("Item name and unit are required.")
+
+                cursor.execute("""
+                    INSERT INTO inventory
+                    (item_name, category, quantity, unit, minimum_stock,
+                     expiry_date, supplier_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    item_name, category, quantity, unit, minimum_stock,
+                    expiry_date, supplier_id
+                ))
+
+                connection.commit()
+                flash("Inventory item added successfully.", "success")
+                return redirect(url_for("inventory"))
+
+            except (ValueError, TypeError) as error:
+                connection.rollback()
+                flash(str(error), "error")
+
+        cursor.execute("SELECT * FROM inventory ORDER BY item_name")
+        items = cursor.fetchall()
+
+        cursor.execute("SELECT * FROM suppliers ORDER BY name")
+        suppliers = cursor.fetchall()
+
+        return render_template(
+            "inventory.html",
+            items=items,
+            suppliers=suppliers,
+            today_date=date.today(),
+            today=date.today()
+        )
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route("/inventory/settings/<int:item_id>", methods=["POST"])
+def update_inventory_settings(item_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        daily_usage = to_decimal(
+            request.form.get("daily_usage"), "Daily usage", 0
+        )
+        operating_days = int(request.form.get("operating_days", "260"))
+        lead_time_days = int(request.form.get("lead_time_days", "0"))
+        safety_stock = to_decimal(
+            request.form.get("safety_stock"), "Safety stock", 0
+        )
+        ordering_cost = to_decimal(
+            request.form.get("ordering_cost"), "Ordering cost", 0
+        )
+        holding_cost = to_decimal(
+            request.form.get("holding_cost"), "Holding cost", 0
+        )
+
+        if not 1 <= operating_days <= 366:
+            raise ValueError("Operating days must be between 1 and 366.")
+        if lead_time_days < 0:
+            raise ValueError("Lead time cannot be negative.")
+
+        cursor.execute("""
+            UPDATE inventory
+            SET daily_usage = %s,
+                operating_days = %s,
+                lead_time_days = %s,
+                safety_stock = %s,
+                ordering_cost = %s,
+                holding_cost = %s
+            WHERE id = %s
+        """, (
+            daily_usage, operating_days, lead_time_days,
+            safety_stock, ordering_cost, holding_cost, item_id
+        ))
+
+        connection.commit()
+        flash("Inventory settings updated.", "success")
+
+    except (ValueError, TypeError) as error:
+        connection.rollback()
+        flash(str(error), "error")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("inventory"))
+
+
+@app.route("/inventory/receive/<int:item_id>", methods=["POST"])
+def receive_inventory(item_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        quantity_received = to_decimal(
+            request.form.get("quantity_received"),
+            "Quantity received",
+            Decimal("0.01")
+        )
+
+        cursor.execute("""
+            SELECT id, supplier_id
+            FROM inventory
+            WHERE id = %s
+            FOR UPDATE
+        """, (item_id,))
+        item = cursor.fetchone()
+
+        if item is None:
+            raise ValueError("Inventory item not found.")
+
+        cursor.execute("""
+            UPDATE inventory
+            SET quantity = quantity + %s
+            WHERE id = %s
+        """, (quantity_received, item_id))
+
+        cursor.execute("""
+            INSERT INTO stock_receipts
+                (item_id, quantity_received, supplier_id, received_date)
+            VALUES (%s, %s, %s, %s)
+        """, (
+            item_id, quantity_received, item["supplier_id"], date.today()
+        ))
+
+        connection.commit()
+        flash("Stock delivery recorded successfully.", "success")
+
+    except (ValueError, TypeError) as error:
+        connection.rollback()
+        flash(str(error), "error")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("inventory"))
+
+
+@app.route("/inventory/use/<int:item_id>", methods=["POST"])
+def use_inventory(item_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        quantity_used = to_decimal(
+            request.form.get("quantity_used"),
+            "Quantity used",
+            Decimal("0.01")
+        )
+
+        cursor.execute("""
+            SELECT quantity FROM inventory
+            WHERE id = %s FOR UPDATE
+        """, (item_id,))
+        item = cursor.fetchone()
+
+        if item is None:
+            raise ValueError("Inventory item not found.")
+
+        if Decimal(str(item["quantity"])) < quantity_used:
+            raise ValueError("Insufficient stock for this usage.")
+
+        cursor.execute("""
+            UPDATE inventory
+            SET quantity = quantity - %s
+            WHERE id = %s
+        """, (quantity_used, item_id))
+
+        connection.commit()
+        flash("Stock usage recorded successfully.", "success")
+
+    except (ValueError, TypeError) as error:
+        connection.rollback()
+        flash(str(error), "error")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("inventory"))
+
+
+@app.route("/inventory/delete/<int:item_id>", methods=["POST"])
+def delete_inventory(item_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        ensure_meal_planning_tables(cursor)
+
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM meal_ingredients
+            WHERE inventory_id = %s
+        """, (item_id,))
+
+        if cursor.fetchone()["total"] > 0:
+            connection.rollback()
+            flash(
+                "This item is used in a meal plan. Remove it from the "
+                "meal ingredients before deleting it.",
+                "error"
+            )
+            return redirect(url_for("inventory"))
+
+        cursor.execute(
+            "DELETE FROM stock_receipts WHERE item_id = %s", (item_id,)
+        )
+        cursor.execute("DELETE FROM inventory WHERE id = %s", (item_id,))
+
+        if cursor.rowcount:
+            connection.commit()
+            flash("Inventory item deleted.", "success")
+        else:
+            connection.rollback()
+            flash("Inventory item not found.", "error")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("inventory"))
+
+
+# --------------------------------------------------
+# SUPPLIERS
+# --------------------------------------------------
+
+@app.route("/suppliers", methods=["GET", "POST"])
+def suppliers():
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        if request.method == "POST":
+            name = request.form.get("name", "").strip()
+            contact_person = request.form.get("contact_person", "").strip()
+            phone = request.form.get("phone", "").strip()
+            email = request.form.get("email", "").strip()
+            food_supplied = request.form.get("food_supplied", "").strip()
+
+            if not name:
+                flash("Supplier name is required.", "error")
+            else:
+                cursor.execute("""
+                    INSERT INTO suppliers
+                    (name, contact_person, phone, email, food_supplied)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    name, contact_person or None, phone or None,
+                    email or None, food_supplied or None
+                ))
+                connection.commit()
+                flash("Supplier added successfully.", "success")
+                return redirect(url_for("suppliers"))
+
+        cursor.execute("SELECT * FROM suppliers ORDER BY name")
+        supplier_list = cursor.fetchall()
+
+        return render_template("suppliers.html", suppliers=supplier_list)
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route("/suppliers/delete/<int:supplier_id>", methods=["POST"])
+def delete_supplier(supplier_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        ensure_meal_planning_tables(cursor)
+
+        cursor.execute("""
+            UPDATE inventory SET supplier_id = NULL
+            WHERE supplier_id = %s
+        """, (supplier_id,))
+
+        cursor.execute("""
+            UPDATE stock_receipts SET supplier_id = NULL
+            WHERE supplier_id = %s
+        """, (supplier_id,))
+
+        cursor.execute("DELETE FROM suppliers WHERE id = %s", (supplier_id,))
+
+        if cursor.rowcount:
+            connection.commit()
+            flash("Supplier deleted successfully.", "success")
+        else:
+            connection.rollback()
+            flash("Supplier not found.", "error")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("suppliers"))
+
+
+# --------------------------------------------------
+# MEAL PLANNING
+# --------------------------------------------------
+
+@app.route("/meals", methods=["GET", "POST"])
+def meals():
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        ensure_meal_planning_tables(cursor)
+
+        if request.method == "POST":
+            meal_name = request.form.get("meal_name", "").strip()
+            meal_date = parse_date(
+                request.form.get("meal_date"), "meal date", required=True
+            )
+            servings = int(request.form.get("servings", "0"))
+            description = request.form.get("description", "").strip()
+
+            if not meal_name:
+                raise ValueError("Meal name is required.")
+            if servings < 1:
+                raise ValueError("Servings must be at least 1.")
+
+            cursor.execute("""
+                INSERT INTO meal_plans
+                    (meal_name, meal_date, servings, description, status)
+                VALUES (%s, %s, %s, %s, 'Planned')
+            """, (meal_name, meal_date, servings, description or None))
+
+            connection.commit()
+            flash("Meal plan created successfully.", "success")
+            return redirect(url_for("meals"))
+
+        cursor.execute("SELECT * FROM inventory ORDER BY item_name")
+        inventory_items = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT * FROM meal_plans
+            ORDER BY meal_date DESC, id DESC
+        """)
+        meal_list = cursor.fetchall()
+
+        for meal in meal_list:
+            cursor.execute("""
+                SELECT
+                    mi.id AS ingredient_id,
+                    mi.inventory_id,
+                    mi.quantity_per_serving,
+                    i.item_name,
+                    i.unit,
+                    i.quantity AS stock_available,
+                    (mi.quantity_per_serving * %s) AS total_required
+                FROM meal_ingredients mi
+                JOIN inventory i ON i.id = mi.inventory_id
+                WHERE mi.meal_id = %s
+                ORDER BY i.item_name
+            """, (meal["servings"], meal["id"]))
+
+            ingredients = cursor.fetchall()
+
+            for ingredient in ingredients:
+                ingredient["sufficient"] = (
+                    Decimal(str(ingredient["stock_available"]))
+                    >= Decimal(str(ingredient["total_required"]))
+                )
+
+            meal["ingredients"] = ingredients
+            meal["has_ingredients"] = bool(ingredients)
+            meal["has_sufficient_stock"] = (
+                bool(ingredients)
+                and all(item["sufficient"] for item in ingredients)
+            )
+
+        return render_template(
+            "meals.html",
+            meals=meal_list,
+            inventory=inventory_items,
+            inventory_items=inventory_items,
+            today=date.today(),
+            today_date=date.today()
+        )
+
+    except (ValueError, TypeError) as error:
+        connection.rollback()
+        flash(str(error), "error")
+        return redirect(url_for("meals"))
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route("/meals/<int:meal_id>/ingredients", methods=["POST"])
+def add_meal_ingredient(meal_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        ensure_meal_planning_tables(cursor)
+
+        inventory_id = int(request.form.get("inventory_id", "0"))
+        quantity_per_serving = to_decimal(
+            request.form.get("quantity_per_serving"),
+            "Quantity per serving",
+            Decimal("0.001")
+        )
+
+        cursor.execute(
+            "SELECT status FROM meal_plans WHERE id = %s", (meal_id,)
+        )
+        meal = cursor.fetchone()
+
+        if meal is None:
+            raise ValueError("Meal plan not found.")
+        if meal["status"] == "Served":
+            raise ValueError("Ingredients cannot be changed after serving.")
+
+        cursor.execute(
+            "SELECT id FROM inventory WHERE id = %s", (inventory_id,)
+        )
+        if cursor.fetchone() is None:
+            raise ValueError("Select a valid inventory item.")
+
+        cursor.execute("""
+            INSERT INTO meal_ingredients
+                (meal_id, inventory_id, quantity_per_serving)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                quantity_per_serving = VALUES(quantity_per_serving)
+        """, (meal_id, inventory_id, quantity_per_serving))
+
+        connection.commit()
+        flash("Meal ingredient added or updated.", "success")
+
+    except (ValueError, TypeError) as error:
+        connection.rollback()
+        flash(str(error), "error")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("meals"))
+
+
+@app.route(
+    "/meals/ingredients/<int:ingredient_id>/delete",
+    methods=["POST"]
+)
+def delete_meal_ingredient(ingredient_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        ensure_meal_planning_tables(cursor)
+
+        cursor.execute("""
+            SELECT mi.id, mi.meal_id, mp.status
+            FROM meal_ingredients mi
+            JOIN meal_plans mp ON mp.id = mi.meal_id
+            WHERE mi.id = %s
+        """, (ingredient_id,))
+        ingredient = cursor.fetchone()
+
+        if ingredient is None:
+            flash("Ingredient not found.", "error")
+        elif ingredient["status"] == "Served":
+            flash("Ingredients cannot be removed from a served meal.", "error")
+        else:
+            cursor.execute(
+                "DELETE FROM meal_ingredients WHERE id = %s",
+                (ingredient_id,)
+            )
+            connection.commit()
+            flash("Ingredient removed.", "success")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("meals"))
+
+
+@app.route("/meals/<int:meal_id>/serve", methods=["POST"])
+def serve_meal(meal_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        ensure_meal_planning_tables(cursor)
+        connection.commit()
+        connection.start_transaction()
+
+        cursor.execute("""
+            SELECT id, servings, status
+            FROM meal_plans
+            WHERE id = %s
+            FOR UPDATE
+        """, (meal_id,))
+        meal = cursor.fetchone()
+
+        if meal is None:
+            raise ValueError("Meal plan not found.")
+        if meal["status"] == "Served":
+            raise ValueError("This meal has already been served.")
+
+        cursor.execute("""
+            SELECT
+                mi.inventory_id,
+                mi.quantity_per_serving,
+                i.item_name,
+                i.quantity AS stock_available
+            FROM meal_ingredients mi
+            JOIN inventory i ON i.id = mi.inventory_id
+            WHERE mi.meal_id = %s
+            FOR UPDATE
+        """, (meal_id,))
+        ingredients = cursor.fetchall()
+
+        if not ingredients:
+            raise ValueError("Add ingredients before serving this meal.")
+
+        for ingredient in ingredients:
+            required = (
+                Decimal(str(ingredient["quantity_per_serving"]))
+                * Decimal(str(meal["servings"]))
+            )
+            available = Decimal(str(ingredient["stock_available"]))
+
+            if available < required:
+                raise ValueError(
+                    f"Not enough {ingredient['item_name']}. "
+                    f"Required: {required}; available: {available}."
+                )
+
+        for ingredient in ingredients:
+            required = (
+                Decimal(str(ingredient["quantity_per_serving"]))
+                * Decimal(str(meal["servings"]))
+            )
+            cursor.execute("""
+                UPDATE inventory
+                SET quantity = quantity - %s
+                WHERE id = %s
+            """, (required, ingredient["inventory_id"]))
+
+        cursor.execute("""
+            UPDATE meal_plans SET status = 'Served'
+            WHERE id = %s
+        """, (meal_id,))
+
+        connection.commit()
+        flash("Meal marked as served and stock deducted.", "success")
+
+    except (ValueError, TypeError) as error:
+        connection.rollback()
+        flash(str(error), "error")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("meals"))
+
+
+@app.route("/meals/delete/<int:meal_id>", methods=["POST"])
+def delete_meal(meal_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        ensure_meal_planning_tables(cursor)
+
+        cursor.execute(
+            "SELECT status FROM meal_plans WHERE id = %s", (meal_id,)
+        )
+        meal = cursor.fetchone()
+
+        if meal is None:
+            flash("Meal plan not found.", "error")
+        elif meal["status"] == "Served":
+            flash("A served meal cannot be deleted.", "error")
+        else:
+            cursor.execute(
+                "DELETE FROM meal_ingredients WHERE meal_id = %s",
+                (meal_id,)
+            )
+            cursor.execute(
+                "DELETE FROM meal_plans WHERE id = %s", (meal_id,)
+            )
+            connection.commit()
+            flash("Meal plan deleted.", "success")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("meals"))
+
+
+# --------------------------------------------------
+# FOOD WASTE
+# --------------------------------------------------
+
+@app.route("/waste", methods=["GET", "POST"])
+def waste():
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        if request.method == "POST":
+            food_name = request.form.get("food_name", "").strip()
+            unit = request.form.get("unit", "").strip()
+            reason = request.form.get("reason", "").strip()
+            waste_date = parse_date(
+                request.form.get("waste_date"),
+                "waste date",
+                required=True
+            )
+            quantity = to_decimal(
+                request.form.get("quantity"),
+                "Quantity wasted",
+                Decimal("0.01")
+            )
+
+            if not food_name or not unit or not reason:
+                raise ValueError(
+                    "Food item, unit and reason are required."
+                )
+
+            cursor.execute("""
+                INSERT INTO food_waste
+                    (food_name, quantity, unit, reason, waste_date)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (food_name, quantity, unit, reason, waste_date))
+
+            connection.commit()
+            flash("Food-waste record added successfully.", "success")
+            return redirect(url_for("waste"))
+
+        cursor.execute("""
+            SELECT * FROM food_waste
+            ORDER BY waste_date DESC, id DESC
+        """)
+        records = cursor.fetchall()
+
+        return render_template(
+            "waste.html",
+            records=records,
+            today=date.today(),
+            today_date=date.today()
+        )
+
+    except (ValueError, TypeError) as error:
+        connection.rollback()
+        flash(str(error), "error")
+        return redirect(url_for("waste"))
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+@app.route("/waste/delete/<int:waste_id>", methods=["POST"])
+def delete_waste(waste_id):
+    connection = get_db_connection()
+    cursor = get_cursor(connection)
+
+    try:
+        cursor.execute(
+            "DELETE FROM food_waste WHERE id = %s", (waste_id,)
+        )
+
+        if cursor.rowcount:
+            connection.commit()
+            flash("Food-waste record deleted.", "success")
+        else:
+            connection.rollback()
+            flash("Food-waste record not found.", "error")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+    return redirect(url_for("waste"))
+
+
+# --------------------------------------------------
+# RUN APPLICATION
+# --------------------------------------------------
+
+if __name__ == "__main__":
+    app.run(debug=True)
