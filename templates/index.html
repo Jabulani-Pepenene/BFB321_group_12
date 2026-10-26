@@ -1,152 +1,259 @@
-
 {% extends "base.html" %}
 {% block title %}Dashboard | SchoolFeeding360{% endblock %}
 
 {% block content %}
-<div class="page-heading">
-    <div>
-        <p class="eyebrow">SCHOOL FEEDING MANAGEMENT</p>
-        <h1>Dashboard Overview</h1>
-        <p class="muted">
-            Monitor meals, inventory, suppliers and food waste in one place.
-        </p>
-    </div>
-</div>
+<section class="dashboard-hero">
+    <div class="dashboard-hero-copy">
+        <p class="eyebrow hero-eyebrow">SCHOOL FEEDING MANAGEMENT</p>
+        <h1>Good day, team.</h1>
+        <p>One clear view of your school feeding supply chain — from stock on hand to meals served and food waste.</p>
 
-<section class="dashboard-grid">
-    <div class="panel stat-card">
-        <p class="muted">Inventory items</p>
-        <h2>{{ inventory_count }}</h2>
-        <a href="{{ url_for('inventory') }}">Manage inventory</a>
+        <div class="hero-actions">
+            <a class="button hero-button" href="{{ url_for('meals') }}">＋ Plan a meal</a>
+            <a class="button hero-button-outline" href="{{ url_for('inventory') }}">
+                View inventory <span aria-hidden="true">→</span>
+            </a>
+        </div>
     </div>
 
-    <div class="panel stat-card">
-        <p class="muted">Registered suppliers</p>
-        <h2>{{ supplier_count }}</h2>
-        <a href="{{ url_for('suppliers') }}">View suppliers</a>
-    </div>
-
-    <div class="panel stat-card">
-        <p class="muted">Total meal plans</p>
-        <h2>{{ meal_count }}</h2>
-        <a href="{{ url_for('meals') }}">Plan meals</a>
-    </div>
-
-    <div class="panel stat-card">
-        <p class="muted">Low-stock items</p>
-        <h2>{{ low_stock_count }}</h2>
-        <a href="{{ url_for('inventory') }}">Check stock</a>
-    </div>
-
-    <div class="panel stat-card">
-        <p class="muted">Food-waste records</p>
-        <h2>{{ waste_count }}</h2>
-        <a href="{{ url_for('waste') }}">View food waste</a>
-    </div>
-
-    <div class="panel stat-card">
-        <p class="muted">Upcoming planned meals</p>
-        <h2>{{ upcoming_meal_count }}</h2>
-        <a href="{{ url_for('meals') }}">View schedule</a>
+    <div class="hero-decoration" aria-hidden="true">
+        <div class="hero-orbit orbit-one"></div>
+        <div class="hero-orbit orbit-two"></div>
+        <div class="hero-plate"><span>SF</span></div>
+        <span class="hero-leaf leaf-one">✦</span>
+        <span class="hero-leaf leaf-two">✦</span>
     </div>
 </section>
 
-<section class="panel">
-    <div class="panel-heading">
-        <h2>Upcoming meals</h2>
-        <a href="{{ url_for('meals') }}">Manage meals</a>
+<section class="dashboard-section" aria-label="Key performance indicators">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">AT A GLANCE</p>
+            <h2>Operations overview</h2>
+        </div>
+        <span class="section-note">Your feeding programme, in one place</span>
     </div>
 
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Meal</th>
-                    <th>Date</th>
-                    <th>Servings</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for meal in upcoming_meals %}
-                <tr>
-                    <td>{{ meal.meal_name }}</td>
-                    <td>{{ meal.meal_date }}</td>
-                    <td>{{ meal.servings }}</td>
-                    <td>{{ meal.status }}</td>
-                </tr>
-            {% else %}
-                <tr>
-                    <td colspan="4" class="empty-cell">
-                        No upcoming meals scheduled.
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <div class="dashboard-grid dashboard-stat-grid">
+        <article class="panel stat-card stat-inventory">
+            <div class="stat-topline">
+                <span class="stat-icon" aria-hidden="true">▦</span>
+                <span class="stat-context">STOCK CONTROL</span>
+            </div>
+            <p class="stat-label">Inventory items</p>
+            <h3>{{ inventory_count }}</h3>
+            <a class="stat-link" href="{{ url_for('inventory') }}">Manage inventory →</a>
+        </article>
 
-<section class="panel">
-    <div class="panel-heading">
-        <h2>Stock and expiry alerts</h2>
-        <a href="{{ url_for('inventory') }}">Manage inventory</a>
-    </div>
+        <article class="panel stat-card stat-suppliers">
+            <div class="stat-topline">
+                <span class="stat-icon" aria-hidden="true">⇄</span>
+                <span class="stat-context">PROCUREMENT</span>
+            </div>
+            <p class="stat-label">Registered suppliers</p>
+            <h3>{{ supplier_count }}</h3>
+            <a class="stat-link" href="{{ url_for('suppliers') }}">View suppliers →</a>
+        </article>
 
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Available stock</th>
-                    <th>Reorder point</th>
-                    <th>Expiry date</th>
-                    <th>Alert</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for item in stock_alerts %}
-                <tr>
-                    <td>{{ item.item_name }}</td>
-                    <td>{{ item.quantity }} {{ item.unit }}</td>
-                    <td>{{ item.reorder_point }}</td>
-                    <td>{{ item.expiry_date or "Not recorded" }}</td>
-                    <td>
-                        {% if item.expiry_date and item.expiry_date < today_date %}
-                            Expired
-                        {% elif item.daily_usage is defined and item.daily_usage > 0 and item.quantity <= item.reorder_point %}
-                            Reorder stock
-                        {% else %}
-                            Check expiry
-                        {% endif %}
-                    </td>
-                </tr>
-            {% else %}
-                <tr>
-                    <td colspan="5" class="empty-cell">
-                        No current stock or expiry alerts.
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <article class="panel stat-card stat-meals">
+            <div class="stat-topline">
+                <span class="stat-icon" aria-hidden="true">♨</span>
+                <span class="stat-context">MEAL SERVICE</span>
+            </div>
+            <p class="stat-label">Total meal plans</p>
+            <h3>{{ meal_count }}</h3>
+            <a class="stat-link" href="{{ url_for('meals') }}">Plan and review meals →</a>
+        </article>
+
+        <article class="panel stat-card stat-alerts">
+            <div class="stat-topline">
+                <span class="stat-icon" aria-hidden="true">!</span>
+                <span class="stat-context">NEEDS ATTENTION</span>
+            </div>
+            <p class="stat-label">Low-stock items</p>
+            <h3>{{ low_stock_count }}</h3>
+            <a class="stat-link" href="{{ url_for('inventory') }}">Check stock levels →</a>
+        </article>
+
+        <article class="panel stat-card stat-waste">
+            <div class="stat-topline">
+                <span class="stat-icon" aria-hidden="true">↻</span>
+                <span class="stat-context">WASTE REDUCTION</span>
+            </div>
+            <p class="stat-label">Food-waste records</p>
+            <h3>{{ waste_count }}</h3>
+            <a class="stat-link" href="{{ url_for('waste') }}">Review food waste →</a>
+        </article>
+
+        <article class="panel stat-card stat-upcoming">
+            <div class="stat-topline">
+                <span class="stat-icon" aria-hidden="true">▣</span>
+                <span class="stat-context">SCHEDULING</span>
+            </div>
+            <p class="stat-label">Upcoming planned meals</p>
+            <h3>{{ upcoming_meal_count }}</h3>
+            <a class="stat-link" href="{{ url_for('meals') }}">View meal schedule →</a>
+        </article>
     </div>
 </section>
 
-<section class="panel">
-    <div class="panel-heading">
-        <h2>Food waste overview</h2>
-        <a href="{{ url_for('waste') }}">Record food waste</a>
-    </div>
+<section class="dashboard-content-grid">
+    <section class="panel dashboard-panel">
+        <div class="panel-heading dashboard-panel-heading">
+            <div>
+                <p class="eyebrow">MEAL SERVICE</p>
+                <h2>Upcoming meals</h2>
+                <p>Keep the team ready for the next service.</p>
+            </div>
+            <a class="text-link" href="{{ url_for('meals') }}">All meal plans →</a>
+        </div>
 
-    <p>
-        <strong>{{ recent_waste.record_count }}</strong>
-        food-waste records were recorded in the last 30 days.
-    </p>
-    <p class="muted">
-        Quantities may use different units, so they should be analysed by
-        ingredient and unit rather than added into one total.
-    </p>
+        <div class="table-wrap">
+            <table class="dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Meal</th>
+                        <th>Date</th>
+                        <th>Servings</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for meal in upcoming_meals %}
+                    <tr>
+                        <td><span class="table-primary">{{ meal.meal_name }}</span></td>
+                        <td>{{ meal.meal_date }}</td>
+                        <td>{{ meal.servings }}</td>
+                        <td>
+                            {% if meal.status == 'Served' %}
+                                <span class="status success">{{ meal.status }}</span>
+                            {% elif meal.status == 'Planned' %}
+                                <span class="status warning">{{ meal.status }}</span>
+                            {% else %}
+                                <span class="status">{{ meal.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="empty-cell">
+                            <span class="empty-state-icon" aria-hidden="true">▣</span>
+                            <strong>No upcoming meals scheduled</strong>
+                            <span>Create a meal plan to see it here.</span>
+                            <a class="button small" href="{{ url_for('meals') }}">Create meal plan</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel dashboard-panel alerts-panel">
+        <div class="panel-heading dashboard-panel-heading">
+            <div>
+                <p class="eyebrow">STOCK CONTROL</p>
+                <h2>Stock &amp; expiry alerts</h2>
+                <p>Items that may need a closer look.</p>
+            </div>
+            <a class="text-link" href="{{ url_for('inventory') }}">Inventory →</a>
+        </div>
+
+        <div class="table-wrap">
+            <table class="dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Available</th>
+                        <th>Reorder point</th>
+                        <th>Expiry</th>
+                        <th>Alert</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stock_alerts %}
+                    <tr>
+                        <td><span class="table-primary">{{ item.item_name }}</span></td>
+                        <td>{{ item.quantity }} {{ item.unit }}</td>
+                        <td>{{ item.reorder_point }}</td>
+                        <td>{{ item.expiry_date or "Not recorded" }}</td>
+                        <td>
+                           {% if item.expiry_date and item.expiry_date < today_date.isoformat() %}
+                                <span class="status danger">Expired</span>
+                            {% elif item.daily_usage is defined and item.daily_usage > 0 and item.quantity <= item.reorder_point %}
+                                <span class="status warning">Reorder stock</span>
+                            {% else %}
+                                <span class="status">Check expiry</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="empty-cell">
+                            <span class="empty-state-icon" aria-hidden="true">✓</span>
+                            <strong>No current stock or expiry alerts</strong>
+                            <span>Your dashboard has no alerts to show.</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+
+<section class="dashboard-bottom-grid">
+    <section class="panel waste-summary-panel">
+        <div class="summary-icon waste-summary-icon" aria-hidden="true">↻</div>
+
+        <div class="summary-copy">
+            <p class="eyebrow">WASTE REDUCTION</p>
+            <h2>Food waste overview</h2>
+
+            <p>
+                <strong>{{ recent_waste.record_count }}</strong>
+                food-waste records were recorded in the last 30 days.
+            </p>
+
+            <p class="muted">
+                Quantities can use different units, so analyse waste by ingredient
+                and unit rather than adding everything into one total.
+            </p>
+
+            <a class="text-link" href="{{ url_for('waste') }}">Record or review waste →</a>
+        </div>
+    </section>
+
+    <section class="panel quick-actions-panel">
+        <p class="eyebrow">WORKSPACE SHORTCUTS</p>
+        <h2>Quick actions</h2>
+
+        <a class="quick-action" href="{{ url_for('inventory') }}">
+            <span class="quick-action-icon">＋</span>
+            <span>
+                <strong>Update inventory</strong>
+                <small>Add items or record stock movement</small>
+            </span>
+            <span class="quick-action-arrow" aria-hidden="true">→</span>
+        </a>
+
+        <a class="quick-action" href="{{ url_for('suppliers') }}">
+            <span class="quick-action-icon">⇄</span>
+            <span>
+                <strong>Manage suppliers</strong>
+                <small>Keep supplier information up to date</small>
+            </span>
+            <span class="quick-action-arrow" aria-hidden="true">→</span>
+        </a>
+
+        <a class="quick-action" href="{{ url_for('meals') }}">
+            <span class="quick-action-icon">♨</span>
+            <span>
+                <strong>Plan a meal</strong>
+                <small>Prepare upcoming meal service</small>
+            </span>
+            <span class="quick-action-arrow" aria-hidden="true">→</span>
+        </a>
+    </section>
 </section>
 {% endblock %}
-

@@ -5,89 +5,235 @@
 {% block page_heading %}Supplier Management{% endblock %}
 
 {% block content %}
-<div class="page-intro">
-    <div>
-        <h2>Food Suppliers</h2>
-        <p>Maintain supplier contacts and track which food products they provide.</p>
-    </div>
-</div>
 
-<div class="panel">
-    <div class="panel-heading">
-        <h2>Add Supplier</h2>
-    </div>
+<section class="suppliers-page">
 
-    <form method="POST" action="/suppliers" class="form-grid">
-        <div>
-            <label for="name">Supplier name *</label>
-            <input id="name" name="name" required>
+    <!-- PREMIUM PAGE INTRO -->
+    <div class="suppliers-hero">
+        <div class="suppliers-hero-icon">♧</div>
+        <div class="suppliers-hero-copy">
+            <span class="suppliers-eyebrow">PARTNER NETWORK</span>
+            <h2>Food Suppliers</h2>
+            <p>Build stronger supplier relationships, organise food sourcing and keep your school kitchen connected to trusted providers.</p>
         </div>
-
-        <div>
-            <label for="contact_person">Contact person</label>
-            <input id="contact_person" name="contact_person">
+        <div class="suppliers-hero-decoration" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
         </div>
-
-        <div>
-            <label for="phone">Phone number</label>
-            <input id="phone" name="phone" type="tel">
-        </div>
-
-        <div>
-            <label for="email">Email address</label>
-            <input id="email" name="email" type="email">
-        </div>
-
-        <div class="full-width">
-            <label for="food_supplied">Food supplied</label>
-            <textarea id="food_supplied" name="food_supplied" rows="3" placeholder="e.g. Rice, beans, vegetables"></textarea>
-        </div>
-
-        <div class="form-actions">
-            <button class="button" type="submit">Add Supplier</button>
-        </div>
-    </form>
-</div>
-
-<div class="panel">
-    <div class="panel-heading">
-        <h2>Registered Suppliers</h2>
-        <span class="count-badge">{{ suppliers|length }} suppliers</span>
     </div>
 
-    {% if suppliers %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Supplier</th>
-                    <th>Contact person</th>
-                    <th>Phone</th>
-                    <th>Email</th>
-                    <th>Food supplied</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for supplier in suppliers %}
-                <tr>
-                    <td><strong>{{ supplier.name }}</strong></td>
-                    <td>{{ supplier.contact_person or '—' }}</td>
-                    <td>{{ supplier.phone or '—' }}</td>
-                    <td>{{ supplier.email or '—' }}</td>
-                    <td>{{ supplier.food_supplied or '—' }}</td>
-                    <td>
-                        <form method="POST" action="/suppliers/delete/{{ supplier.id }}" onsubmit="return confirm('Delete this supplier? Inventory records will no longer be linked to this supplier.');">
-                            <button type="submit" class="delete-button small">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- SUPPLIER SUMMARY -->
+    <div class="suppliers-summary">
+
+        <div class="suppliers-summary-card">
+            <div class="suppliers-summary-icon suppliers-icon-green">♧</div>
+            <div>
+                <span>Registered suppliers</span>
+                <strong>{{ suppliers|length }}</strong>
+                <small>Suppliers in your directory</small>
+            </div>
+        </div>
+
+        <div class="suppliers-summary-card">
+            <div class="suppliers-summary-icon suppliers-icon-gold">✉</div>
+            <div>
+                <span>Contact directory</span>
+                <strong>Centralised</strong>
+                <small>Contact details in one place</small>
+            </div>
+        </div>
+
+        <div class="suppliers-summary-card">
+            <div class="suppliers-summary-icon suppliers-icon-ivory">▤</div>
+            <div>
+                <span>Food sourcing</span>
+                <strong>Organised</strong>
+                <small>Track supplied food products</small>
+            </div>
+        </div>
+
     </div>
-    {% else %}
-        <p class="empty-cell">No suppliers registered yet.</p>
-    {% endif %}
-</div>
+
+    <!-- ADD SUPPLIER -->
+    <section class="panel suppliers-panel">
+
+        <div class="suppliers-panel-heading">
+            <div class="suppliers-heading-icon">＋</div>
+            <div>
+                <span class="suppliers-eyebrow">GROW YOUR NETWORK</span>
+                <h2>Add a Supplier</h2>
+                <p>Record supplier details and the food products they provide.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="/suppliers" class="form-grid suppliers-form">
+
+            <div>
+                <label for="name">Supplier name <span>*</span></label>
+                <input id="name" name="name" type="text"
+                       placeholder="Enter business or supplier name"
+                       autocomplete="organization" required>
+            </div>
+
+            <div>
+                <label for="contact_person">Contact person</label>
+                <input id="contact_person" name="contact_person" type="text"
+                       placeholder="Full name"
+                       autocomplete="name">
+            </div>
+
+            <div>
+                <label for="phone">Phone number</label>
+                <input id="phone" name="phone" type="tel"
+                       placeholder="e.g. 012 345 6789"
+                       autocomplete="tel">
+            </div>
+
+            <div>
+                <label for="email">Email address</label>
+                <input id="email" name="email" type="email"
+                       placeholder="supplier@example.co.za"
+                       autocomplete="email">
+            </div>
+
+            <div class="full-width suppliers-food-field">
+                <label for="food_supplied">Food products supplied</label>
+                <textarea id="food_supplied" name="food_supplied" rows="3"
+                          placeholder="e.g. Rice, beans, fresh vegetables, fruit and cooking oil"></textarea>
+                <small>List the food items or product categories this supplier provides.</small>
+            </div>
+
+            <div class="form-actions suppliers-form-actions">
+                <button class="button suppliers-primary-button" type="submit">
+                    <span>＋</span> Register Supplier
+                </button>
+            </div>
+
+        </form>
+    </section>
+
+    <!-- REGISTERED SUPPLIERS -->
+    <section class="panel suppliers-panel suppliers-directory-panel">
+
+        <div class="suppliers-panel-heading suppliers-directory-heading">
+            <div class="suppliers-heading-icon">▤</div>
+
+            <div class="suppliers-directory-copy">
+                <span class="suppliers-eyebrow">SUPPLIER DIRECTORY</span>
+                <h2>Registered Suppliers</h2>
+                <p>Review business contacts and the products available through your supplier network.</p>
+            </div>
+
+            <span class="suppliers-count-badge">
+                {{ suppliers|length }} suppliers
+            </span>
+        </div>
+
+        {% if suppliers %}
+
+        <div class="suppliers-table-container">
+            <table class="suppliers-table">
+                <thead>
+                    <tr>
+                        <th>Supplier</th>
+                        <th>Contact person</th>
+                        <th>Phone number</th>
+                        <th>Email address</th>
+                        <th>Food supplied</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for supplier in suppliers %}
+                    <tr>
+                        <td>
+                            <div class="supplier-name-cell">
+                                <span class="supplier-avatar" aria-hidden="true">
+                                    {{ supplier.name[0]|upper if supplier.name else 'S' }}
+                                </span>
+                                <div>
+                                    <strong>{{ supplier.name }}</strong>
+                                    <small>Registered supplier</small>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            {% if supplier.contact_person %}
+                                <span class="supplier-contact-value">
+                                    {{ supplier.contact_person }}
+                                </span>
+                            {% else %}
+                                <span class="supplier-not-provided">Not provided</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if supplier.phone %}
+                                <span class="supplier-contact-value">
+                                    {{ supplier.phone }}
+                                </span>
+                            {% else %}
+                                <span class="supplier-not-provided">Not provided</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if supplier.email %}
+                                <span class="supplier-email-value">
+                                    {{ supplier.email }}
+                                </span>
+                            {% else %}
+                                <span class="supplier-not-provided">Not provided</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if supplier.food_supplied %}
+                                <span class="supplier-food-value">
+                                    {{ supplier.food_supplied }}
+                                </span>
+                            {% else %}
+                                <span class="supplier-not-provided">Not specified</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <form method="POST"
+                                  action="/suppliers/delete/{{ supplier.id }}"
+                                  onsubmit="return confirm('Delete this supplier? Inventory records will no longer be linked to this supplier.');">
+
+                                <button type="submit"
+                                        class="delete-button small suppliers-delete-button">
+                                    <span aria-hidden="true">×</span> Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="suppliers-directory-footer">
+            <span class="suppliers-footer-dot"></span>
+            Supplier records are managed through your SchoolFeeding360 directory.
+        </div>
+
+        {% else %}
+
+        <div class="suppliers-empty-state">
+            <div class="suppliers-empty-icon">♧</div>
+            <h3>Your supplier network starts here</h3>
+            <p>No suppliers have been registered yet. Use the form above to add your first supplier and start building your food sourcing directory.</p>
+        </div>
+
+        {% endif %}
+
+    </section>
+
+</section>
+
 {% endblock %}

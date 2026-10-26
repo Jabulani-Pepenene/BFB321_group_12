@@ -4,50 +4,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>{% block title %}SchoolFeeding360{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <meta name="theme-color" content="#102b22">
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='CSS/style.css') }}">
 </head>
+
 <body>
     <div class="layout">
-        <aside class="sidebar">
-            <a class="brand" href="/">SchoolFeeding<span>360</span></a>
-            <p class="nav-label">MAIN MENU</p>
 
-            <nav>
-                <a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a>
-                <a href="/inventory" class="{% if request.path.startswith('/inventory') %}active{% endif %}">Inventory</a>
-                <a href="/suppliers" class="{% if request.path.startswith('/suppliers') %}active{% endif %}">Suppliers</a>
-                <a href="/meals" class="{% if request.path.startswith('/meals') %}active{% endif %}">Meal Planning</a>
-                <a href="/waste" class="{% if request.path.startswith('/waste') %}active{% endif %}">Food Waste</a>
-            </nav>
+        <!-- PREMIUM SIDEBAR -->
+        <aside class="sidebar">
+
+            
+<!-- SCHOOLFEEDING360 SIDEBAR BRAND -->
+<a class="brand brand-premium"
+   href="{{ url_for('index') }}"
+   aria-label="SchoolFeeding360 Dashboard">
+
+    <span class="brand-emblem">
+        <img
+            src="{{ url_for('static', filename='images/logoSC.png') }}"
+            alt="SchoolFeeding360 logo"
+        >
+    </span>
+
+    
+    </span>
+
+</a>
+
+            <div class="sidebar-section">
+                <p class="nav-label">WORKSPACE</p>
+
+                <nav class="sidebar-nav">
+
+                    <a href="{{ url_for('index') }}"
+                       class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
+                        <span class="nav-icon">⌂</span>
+                        <span>Dashboard</span>
+                        {% if request.endpoint == 'index' %}
+                            <span class="nav-indicator"></span>
+                        {% endif %}
+                    </a>
+
+                    <a href="{{ url_for('inventory') }}"
+                       class="nav-link {% if request.path.startswith('/inventory') %}active{% endif %}">
+                        <span class="nav-icon">▤</span>
+                        <span>Inventory</span>
+                    </a>
+
+                    <a href="{{ url_for('suppliers') }}"
+                       class="nav-link {% if request.path.startswith('/suppliers') %}active{% endif %}">
+                        <span class="nav-icon">♧</span>
+                        <span>Suppliers</span>
+                    </a>
+
+                    <a href="{{ url_for('meals') }}"
+                       class="nav-link {% if request.path.startswith('/meals') %}active{% endif %}">
+                        <span class="nav-icon">♨</span>
+                        <span>Meal Planning</span>
+                    </a>
+
+                    <a href="{{ url_for('waste') }}"
+                       class="nav-link {% if request.path.startswith('/waste') %}active{% endif %}">
+                        <span class="nav-icon">♻</span>
+                        <span>Food Waste</span>
+                    </a>
+
+                </nav>
+            </div>
+
+            <div class="sidebar-spacer"></div>
+
+            <div class="sidebar-support">
+                <div class="support-icon">✦</div>
+
+                <div>
+                    <strong>Better meals. Better futures.</strong>
+                    <p>Every meal makes a difference.</p>
+                </div>
+            </div>
 
             <div class="sidebar-footer">
-                School food management<br>
-                <span>Manage • Monitor • Improve</span>
+                <span class="footer-status"></span>
+                <span>Manage</span>
+                <span class="footer-dot">·</span>
+                <span>Monitor</span>
+                <span class="footer-dot">·</span>
+                <span>Improve</span>
             </div>
+
         </aside>
 
+        <!-- MAIN APPLICATION -->
         <main class="main">
+
+            <!-- TOP BAR -->
             <header class="topbar">
-                <div>
+
+                <div class="topbar-heading">
                     <p class="eyebrow">SCHOOL FEEDING MANAGEMENT</p>
                     <h1>{% block page_heading %}Dashboard{% endblock %}</h1>
+                    <p class="topbar-subtitle">
+                        A smarter way to manage school nutrition.
+                    </p>
                 </div>
-                <div class="topbar-label">SchoolFeeding360</div>
+
+                <div class="topbar-actions">
+
+                    <div class="system-status">
+                        <span class="status-dot"></span>
+                        <span>System workspace</span>
+                    </div>
+
+                    <div class="topbar-divider"></div>
+
+                    <div class="admin-profile">
+                        <div class="admin-avatar">A</div>
+
+                        <div class="admin-details">
+                            <strong>Administrator</strong>
+                            <span>Management portal</span>
+                        </div>
+                    </div>
+
+                    <form action="{{ url_for('logout') }}" method="POST">
+                        <button class="logout-button" type="submit"
+                                title="Sign out" aria-label="Sign out">
+                            <span aria-hidden="true">↗</span>
+                            <span>Sign out</span>
+                        </button>
+                    </form>
+
+                </div>
             </header>
 
+            <!-- PAGE CONTENT -->
             <section class="content">
+
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert {{ category }}">{{ message }}</div>
-                        {% endfor %}
+                        <div class="flash-container">
+                            {% for category, message in messages %}
+                                <div class="alert {{ category }}">
+                                    <span class="flash-symbol">✦</span>
+                                    <span>{{ message }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
                     {% endif %}
                 {% endwith %}
 
                 {% block content %}{% endblock %}
+
+                <footer class="app-footer">
+                    <span>© {{ 2026 }} SchoolFeeding360</span>
+                    <span>Supporting healthier school communities.</span>
+                </footer>
+
             </section>
         </main>
+
     </div>
 </body>
 </html>
+```

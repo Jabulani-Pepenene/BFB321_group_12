@@ -5,96 +5,281 @@
 {% block page_heading %}Food Waste Management{% endblock %}
 
 {% block content %}
-<div class="page-intro">
-    <div>
-        <h2>Record Food Waste</h2>
-        <p>Track wasted food, identify reasons and support waste-reduction decisions.</p>
-    </div>
-</div>
+<div class="waste-page">
 
-<div class="panel">
-    <div class="panel-heading">
-        <h2>Add Waste Record</h2>
-    </div>
-
-    <form method="POST" action="/waste" class="form-grid">
-        <div>
-            <label for="food_name">Food item *</label>
-            <input id="food_name" name="food_name" required>
+    <!-- Premium page introduction -->
+    <section class="waste-hero">
+        <div class="waste-hero-content">
+            <span class="waste-eyebrow">SUSTAINABILITY &amp; CONTROL</span>
+            <h2>Food Waste Management</h2>
+            <p>
+                Track food losses, understand their causes and make
+                informed decisions to reduce waste across your school.
+            </p>
         </div>
 
-        <div>
-            <label for="quantity">Quantity wasted *</label>
-            <input id="quantity" name="quantity" type="number" min="0.01" step="0.01" required>
+        <div class="waste-hero-icon" aria-hidden="true">
+            <span>♻</span>
         </div>
+    </section>
 
-        <div>
-            <label for="unit">Unit *</label>
-            <input id="unit" name="unit" placeholder="kg, litres, portions..." required>
-        </div>
-
-        <div>
-            <label for="waste_date">Date *</label>
-            <input id="waste_date" name="waste_date" type="date" required>
-        </div>
-
-        <div class="full-width">
-            <label for="reason">Reason for waste *</label>
-            <select id="reason" name="reason" required>
-                <option value="">Select a reason</option>
-                <option value="Expired">Expired</option>
-                <option value="Overproduction">Overproduction</option>
-                <option value="Preparation waste">Preparation waste</option>
-                <option value="Spoilage">Spoilage</option>
-                <option value="Leftovers">Uneaten food / leftovers</option>
-                <option value="Damaged">Damaged food</option>
-                <option value="Other">Other</option>
-            </select>
-        </div>
-
-        <div class="form-actions">
-            <button class="button" type="submit">Save Waste Record</button>
-        </div>
-    </form>
-</div>
-
-<div class="panel">
-    <div class="panel-heading">
-        <h2>Waste History</h2>
-        <span class="count-badge">{{ records|length }} records</span>
-    </div>
-
-    {% if records %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Food item</th>
-                    <th>Quantity</th>
-                    <th>Reason</th>
-                    <th>Date</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for record in records %}
-                <tr>
-                    <td><strong>{{ record.food_name }}</strong></td>
-                    <td>{{ record.quantity }} {{ record.unit }}</td>
-                    <td>{{ record.reason }}</td>
-                    <td>{{ record.waste_date }}</td>
-                    <td>
-                        <form method="POST" action="/waste/delete/{{ record.id }}" onsubmit="return confirm('Delete this waste record?');">
-                            <button type="submit" class="delete-button small">Delete</button>
-                        </form>
-                    </td>
-                </tr>
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="waste-flash-messages" role="status" aria-live="polite">
+                {% for category, message in messages %}
+                    <div class="waste-flash-message {{ category }}">
+                        <span class="waste-flash-indicator"></span>
+                        {{ message }}
+                    </div>
                 {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-        <p class="empty-cell">No food-waste records have been added yet.</p>
-    {% endif %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Summary cards -->
+    <section class="waste-summary">
+        <article class="waste-summary-card">
+            <div class="waste-summary-icon">▤</div>
+            <div>
+                <span class="waste-summary-label">Total Records</span>
+                <strong>{{ records|length }}</strong>
+                <p>Recorded food-waste entries</p>
+            </div>
+        </article>
+
+        <article class="waste-summary-card">
+            <div class="waste-summary-icon waste-summary-icon-gold">◷</div>
+            <div>
+                <span class="waste-summary-label">Latest Activity</span>
+                <strong>
+                    {% if records %}
+                        {{ records[0].waste_date }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </strong>
+                <p>Most recent entry in the list</p>
+            </div>
+        </article>
+
+        <article class="waste-summary-card">
+            <div class="waste-summary-icon waste-summary-icon-pink">↗</div>
+            <div>
+                <span class="waste-summary-label">Waste Prevention</span>
+                <strong>Take Action</strong>
+                <p>Use recorded reasons to identify improvements</p>
+            </div>
+        </article>
+    </section>
+
+    <!-- Add waste record -->
+    <section class="waste-panel" id="add-waste">
+        <div class="waste-panel-heading">
+            <div class="waste-heading-icon">＋</div>
+            <div>
+                <h2>Record Food Waste</h2>
+                <p>Capture the details of food that has been discarded.</p>
+            </div>
+        </div>
+
+        <form
+            method="POST"
+            action="{{ url_for('waste') }}"
+            class="waste-form"
+        >
+            <div class="waste-form-grid">
+
+                <div class="waste-field">
+                    <label for="food_name">Food item <span>*</span></label>
+                    <input
+                        id="food_name"
+                        name="food_name"
+                        type="text"
+                        maxlength="150"
+                        placeholder="e.g. Cooked rice"
+                        required
+                    >
+                </div>
+
+                <div class="waste-field">
+                    <label for="quantity">Quantity wasted <span>*</span></label>
+                    <input
+                        id="quantity"
+                        name="quantity"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="e.g. 2.50"
+                        required
+                    >
+                </div>
+
+                <div class="waste-field">
+                    <label for="unit">Unit of measurement <span>*</span></label>
+                    <input
+                        id="unit"
+                        name="unit"
+                        type="text"
+                        maxlength="30"
+                        placeholder="e.g. kg, litres, portions"
+                        required
+                    >
+                </div>
+
+                <div class="waste-field">
+                    <label for="waste_date">Date recorded <span>*</span></label>
+                    <input
+                        id="waste_date"
+                        name="waste_date"
+                        type="date"
+                        value="{{ today_date }}"
+                        max="{{ today_date }}"
+                        required
+                    >
+                </div>
+
+                <div class="waste-field waste-field-full">
+                    <label for="reason">Reason for waste <span>*</span></label>
+                    <select id="reason" name="reason" required>
+                        <option value="">Select the main reason</option>
+                        <option value="Expired">Expired</option>
+                        <option value="Overproduction">Overproduction</option>
+                        <option value="Preparation waste">Preparation waste</option>
+                        <option value="Spoilage">Spoilage</option>
+                        <option value="Leftovers">Uneaten food / leftovers</option>
+                        <option value="Damaged">Damaged food</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <small>
+                        Identifying the reason helps your team plan
+                        purchasing and food preparation more effectively.
+                    </small>
+                </div>
+
+            </div>
+
+            <div class="waste-form-footer">
+                <p><span>*</span> Required fields</p>
+
+                <button class="waste-primary-button" type="submit">
+                    <span>＋</span>
+                    Save Waste Record
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Waste history -->
+    <section class="waste-panel waste-history-panel">
+        <div class="waste-panel-heading waste-history-heading">
+            <div class="waste-heading-icon">▤</div>
+
+            <div>
+                <h2>Waste History</h2>
+                <p>Review previously recorded food-waste entries.</p>
+            </div>
+
+            <span class="waste-count-badge">
+                {{ records|length }}
+                {{ 'record' if records|length == 1 else 'records' }}
+            </span>
+        </div>
+
+        {% if records %}
+            <div class="waste-table-container">
+                <table class="waste-table">
+                    <thead>
+                        <tr>
+                            <th>Food item</th>
+                            <th>Quantity wasted</th>
+                            <th>Reason</th>
+                            <th>Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for record in records %}
+                            <tr>
+                                <td>
+                                    <div class="waste-food-cell">
+                                        <span class="waste-food-icon">♧</span>
+                                        <strong>{{ record.food_name }}</strong>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="waste-quantity">
+                                        {{ record.quantity }} {{ record.unit }}
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <span class="waste-reason-badge">
+                                        {{ record.reason }}
+                                    </span>
+                                </td>
+
+                                <td class="waste-date-cell">
+                                    {{ record.waste_date }}
+                                </td>
+
+                                <td>
+                                    <form
+                                        method="POST"
+                                        action="{{ url_for('delete_waste', record_id=record.id) }}"
+                                        onsubmit="return confirm('Are you sure you want to delete this waste record?');"
+                                    >
+                                        <button
+                                            type="submit"
+                                            class="waste-delete-button"
+                                            aria-label="Delete waste record for {{ record.food_name }}"
+                                        >
+                                            <span aria-hidden="true">×</span>
+                                            Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="waste-table-footer">
+                Showing {{ records|length }}
+                {{ 'record' if records|length == 1 else 'records' }}
+            </div>
+
+        {% else %}
+            <div class="waste-empty-state">
+                <div class="waste-empty-icon">♧</div>
+                <h3>No waste records yet</h3>
+                <p>
+                    Once food waste is recorded, your entries will appear here
+                    to help you monitor losses and identify recurring causes.
+                </p>
+                <a href="#add-waste" class="waste-empty-button">
+                    Add your first record
+                </a>
+            </div>
+        {% endif %}
+    </section>
+
+    <!-- Practical reminder -->
+    <section class="waste-insight">
+        <div class="waste-insight-icon">✦</div>
+        <div>
+            <h3>A more sustainable school kitchen</h3>
+            <p>
+                Review waste reasons regularly. Better portion planning,
+                accurate purchasing and safe food storage can help reduce
+                avoidable food losses.
+            </p>
+        </div>
+    </section>
+
 </div>
 {% endblock %}
+```

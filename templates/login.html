@@ -1,0 +1,675 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#153c2b">
+
+    <title>Sign In | SchoolFeeding360</title>
+
+    <style>
+        :root {
+            --forest-green: #153c2b;
+            --deep-green: #0b2419;
+            --gold: #c5a04d;
+            --gold-light: #e5cc83;
+            --ivory: #fffdf6;
+            --text-dark: #24352b;
+            --text-muted: #69776d;
+            --border: #dce3da;
+            --error: #a62d2d;
+            --success: #246b43;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            min-height: 100dvh;
+            font-family: "Times New Roman", Georgia, serif;
+            color: var(--text-dark);
+            background:
+                linear-gradient(
+                    125deg,
+                    rgba(7, 31, 20, 0.92),
+                    rgba(21, 60, 43, 0.76),
+                    rgba(9, 35, 24, 0.90)
+                ),
+                url("{{ url_for('static', filename='images/splashbackground.png') }}")
+                center / cover no-repeat fixed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 18px;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            animation: float 10s ease-in-out infinite;
+        }
+
+        body::before {
+            width: 350px;
+            height: 350px;
+            top: -130px;
+            right: -100px;
+            border: 1px solid rgba(229, 204, 131, 0.32);
+            box-shadow: 0 0 80px rgba(197, 160, 77, 0.08);
+        }
+
+        body::after {
+            width: 280px;
+            height: 280px;
+            bottom: -110px;
+            left: -90px;
+            border: 1px solid rgba(229, 204, 131, 0.24);
+            animation-delay: -5s;
+        }
+
+        .page-wrapper {
+            width: 100%;
+            max-width: 1050px;
+            position: relative;
+            z-index: 1;
+            animation: appear 0.8s ease both;
+        }
+
+        .login-layout {
+            display: grid;
+            grid-template-columns: 1fr 0.92fr;
+            min-height: 610px;
+            overflow: hidden;
+            border-radius: 22px;
+            background: var(--ivory);
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+        }
+
+        /* Brand panel */
+
+        .brand-panel {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 48px 42px 35px;
+            color: white;
+            overflow: hidden;
+            background:
+                linear-gradient(
+                    160deg,
+                    rgba(12, 43, 29, 0.94),
+                    rgba(21, 60, 43, 0.89)
+                ),
+                url("{{ url_for('static', filename='images/splashbackground.png') }}")
+                center / cover no-repeat;
+        }
+
+        .brand-panel::before {
+            content: "";
+            position: absolute;
+            width: 320px;
+            height: 320px;
+            right: -150px;
+            bottom: -120px;
+            border: 1px solid rgba(229, 204, 131, 0.45);
+            border-radius: 50%;
+            box-shadow:
+                0 0 0 25px rgba(229, 204, 131, 0.035),
+                0 0 0 55px rgba(229, 204, 131, 0.025);
+        }
+
+        .brand-panel::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                var(--gold-light),
+                var(--gold),
+                transparent
+            );
+        }
+
+        .brand-content,
+        .brand-footer {
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo-container {
+            width: 100%;
+            max-width: 320px;
+            margin-bottom: 42px;
+        }
+
+        .brand-logo {
+            display: block;
+            width: 100%;
+            max-width: 300px;
+            max-height: 145px;
+            object-fit: contain;
+            object-position: left center;
+        }
+
+        .gold-line {
+            display: block;
+            width: 65px;
+            height: 3px;
+            margin: 0 0 25px;
+            border-radius: 5px;
+            background: linear-gradient(
+                90deg,
+                var(--gold-light),
+                var(--gold)
+            );
+        }
+
+        .brand-heading {
+            max-width: 390px;
+            font-size: clamp(30px, 3.3vw, 43px);
+            line-height: 1.12;
+            font-weight: normal;
+            letter-spacing: 0.2px;
+            margin-bottom: 20px;
+        }
+
+        .brand-heading span {
+            color: var(--gold-light);
+            font-style: italic;
+        }
+
+        .brand-description {
+            max-width: 360px;
+            color: rgba(255, 255, 255, 0.79);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.9;
+        }
+
+        .brand-footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(229, 204, 131, 0.25);
+            color: rgba(255, 255, 255, 0.68);
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+        }
+
+        /* Login panel */
+
+        .form-panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 42px;
+            background:
+                radial-gradient(
+                    circle at top right,
+                    rgba(197, 160, 77, 0.09),
+                    transparent 38%
+                ),
+                var(--ivory);
+        }
+
+        .form-content {
+            width: 100%;
+            max-width: 365px;
+        }
+
+        .form-eyebrow {
+            color: #9b792e;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            margin-bottom: 13px;
+        }
+
+        .form-heading {
+            color: var(--forest-green);
+            font-size: clamp(32px, 3vw, 40px);
+            font-weight: normal;
+            line-height: 1.15;
+            margin-bottom: 12px;
+        }
+
+        .form-subtitle {
+            color: var(--text-muted);
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+
+        .flash-messages {
+            margin-bottom: 22px;
+        }
+
+        .message {
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .message.error {
+            color: var(--error);
+            background: #fff0ee;
+            border: 1px solid #f1d0ca;
+        }
+
+        .message.success {
+            color: var(--success);
+            background: #edf8f0;
+            border: 1px solid #cbe6d2;
+        }
+
+        .form-group {
+            margin-bottom: 21px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #34473a;
+            font-size: 15px;
+            font-weight: bold;
+            margin-bottom: 9px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper input {
+            display: block;
+            width: 100%;
+            min-height: 51px;
+            padding: 14px 15px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            outline: none;
+            background: #ffffff;
+            color: var(--text-dark);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            transition:
+                border-color 0.25s ease,
+                box-shadow 0.25s ease,
+                background 0.25s ease;
+        }
+
+        .input-wrapper input::placeholder {
+            color: #a1aaa2;
+        }
+
+        .input-wrapper input:hover {
+            border-color: #aebcae;
+        }
+
+        .input-wrapper input:focus {
+            border-color: var(--gold);
+            background: #fffefa;
+            box-shadow: 0 0 0 4px rgba(197, 160, 77, 0.13);
+        }
+
+        .form-options {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin: -4px 0 25px;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+        }
+
+        .form-options a {
+            color: #9b792e;
+            text-decoration: none;
+        }
+
+        .form-options a:hover {
+            text-decoration: underline;
+        }
+
+        .submit-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            min-height: 53px;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            color: #172b1e;
+            background: linear-gradient(
+                115deg,
+                var(--gold-light),
+                var(--gold)
+            );
+            font-family: "Times New Roman", Georgia, serif;
+            font-size: 17px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            box-shadow: 0 7px 18px rgba(154, 117, 36, 0.18);
+            transition:
+                transform 0.25s ease,
+                box-shadow 0.25s ease,
+                filter 0.25s ease;
+        }
+
+        .submit-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 11px 25px rgba(154, 117, 36, 0.25);
+            filter: brightness(1.04);
+        }
+
+        .submit-button:active {
+            transform: translateY(0);
+        }
+
+        .submit-button:focus-visible {
+            outline: 3px solid var(--forest-green);
+            outline-offset: 3px;
+        }
+
+        .register-link {
+            margin-top: 25px;
+            text-align: center;
+            color: #53665b;
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .register-link a {
+            color: #9b792e;
+            font-weight: bold;
+            text-decoration: none;
+            margin-left: 4px;
+        }
+
+        .register-link a:hover {
+            text-decoration: underline;
+        }
+
+        .security-note {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 7px;
+            margin-top: 28px;
+            color: #849087;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .security-icon {
+            color: #68816f;
+            font-size: 14px;
+        }
+
+        /* Animations */
+
+        @keyframes appear {
+            from {
+                opacity: 0;
+                transform: translateY(18px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg);
+            }
+
+            50% {
+                transform: translateY(-18px) rotate(5deg);
+            }
+        }
+
+        /* Responsive layout */
+
+        @media (max-width: 800px) {
+            .page-wrapper {
+                max-width: 540px;
+            }
+
+            .login-layout {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            .brand-panel {
+                min-height: 270px;
+                padding: 30px 32px;
+            }
+
+            .logo-container {
+                max-width: 210px;
+                margin-bottom: 25px;
+            }
+
+            .brand-logo {
+                max-width: 200px;
+                max-height: 85px;
+            }
+
+            .brand-heading {
+                font-size: 31px;
+                max-width: 420px;
+                margin-bottom: 12px;
+            }
+
+            .brand-description {
+                max-width: 420px;
+                font-size: 12px;
+            }
+
+            .brand-footer {
+                margin-top: 25px;
+                padding-top: 14px;
+            }
+
+            .form-panel {
+                padding: 38px 32px 40px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            body {
+                padding: 15px 10px;
+            }
+
+            .login-layout {
+                border-radius: 15px;
+            }
+
+            .brand-panel {
+                padding: 25px 23px;
+            }
+
+            .brand-heading {
+                font-size: 28px;
+            }
+
+            .form-panel {
+                padding: 32px 23px;
+            }
+
+            .form-heading {
+                font-size: 33px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+    
+</head>
+
+<body>
+    <main class="page-wrapper">
+        <section class="login-layout" aria-label="SchoolFeeding360 sign in">
+
+            <!-- Left brand panel -->
+            <div class="brand-panel">
+                <div class="brand-content">
+                    <div class="logo-container">
+                        <img
+                            src="{{ url_for('static', filename='images/logoSC.png') }}"
+                            alt="SchoolFeeding360 logo"
+                            class="brand-logo"
+                        >
+                    </div>
+
+                    <span class="gold-line"></span>
+
+                    <h1 class="brand-heading">
+                        Nourishing schools.<br>
+                        <span>Building futures.</span>
+                    </h1>
+
+                    <p class="brand-description">
+                        Welcome to SchoolFeeding360, your platform for
+                        supporting organised, transparent and efficient
+                        school feeding operations.
+                    </p>
+                </div>
+
+                <div class="brand-footer">
+                    Better nourishment. Brighter tomorrows.
+                </div>
+            </div>
+
+            <!-- Right login panel -->
+            <div class="form-panel">
+                <div class="form-content">
+
+                    <p class="form-eyebrow">Welcome back</p>
+
+                    <h2 class="form-heading">Sign in to your account</h2>
+
+                    <p class="form-subtitle">
+                        Enter your email address and password to continue
+                        to your SchoolFeeding360 dashboard.
+                    </p>
+
+                    <!-- Flask flash messages -->
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            <div class="flash-messages" role="status" aria-live="polite">
+                                {% for category, message in messages %}
+                                    <div class="message {{ category }}">
+                                        {{ message }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST" action="{{ url_for('login') }}">
+
+                        <div class="form-group">
+                            <label for="email">Email address</label>
+
+                            <div class="input-wrapper">
+                                <input
+                                    type="email"
+                                    id="email"
+                                    name="email"
+                                    placeholder="you@example.com"
+                                    autocomplete="username"
+                                    maxlength="254"
+                                    required
+                                    autofocus
+                                >
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Password</label>
+
+                            <div class="input-wrapper">
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    placeholder="Enter your password"
+                                    autocomplete="current-password"
+                                    maxlength="128"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+                        <div class="form-options">
+                            <a
+                                href="#"
+                                onclick="return false;"
+                                title="Password recovery is not yet available"
+                            >
+                                Forgot password?
+                            </a>
+                        </div>
+
+                        <button type="submit" class="submit-button">
+                            Sign In
+                            <span aria-hidden="true">&rarr;</span>
+                        </button>
+
+                    </form>
+
+                    <p class="register-link">
+                        Don't have an account?
+                        <a href="{{ url_for('register') }}">Create one</a>
+                    </p>
+
+                    <div class="security-note">
+                        <span class="security-icon" aria-hidden="true">&#128274;</span>
+                        <span>Your account credentials are protected.</span>
+                    </div>
+
+                </div>
+            </div>
+
+        </section>
+    </main>
+</body>
+</html>
+```

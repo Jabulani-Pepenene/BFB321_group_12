@@ -1,0 +1,68 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#102b22">
+
+    <title>Welcome | SchoolFeeding360</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='CSS/style.css') }}">
+</head>
+
+<body class="splash-page">
+
+    <main class="splash-screen">
+
+        <div class="splash-glow splash-glow-one"></div>
+        <div class="splash-glow splash-glow-two"></div>
+
+        <div class="splash-content">
+
+            <div class="splash-logo">
+                <img
+                    src="{{ url_for('static', filename='images/logoSC.png') }}"
+                    alt="SchoolFeeding360 logo"
+                >
+            </div>
+
+            <div class="splash-divider">
+                <span></span>
+                <i>✦</i>
+                <span></span>
+            </div>
+
+            <p class="splash-eyebrow">
+                SMARTER SCHOOL NUTRITION MANAGEMENT
+            </p>
+
+            <h1>
+                Nourishing futures.<br>
+                <span>One meal at a time.</span>
+            </h1>
+
+            <p class="splash-description">
+                A smarter way to manage school food supplies,
+                plan nutritious meals, and build healthier
+                school communities.
+            </p>
+
+            <a href="{{ url_for('login') }}" class="splash-button">
+                Enter your workspace
+                <span aria-hidden="true">→</span>
+            </a>
+
+            <p class="splash-footer">
+                MANAGE <span>•</span> MONITOR <span>•</span> IMPROVE
+            </p>
+
+        </div>
+
+        <div class="splash-bottom-line"></div>
+
+    </main>
+
+</body>
+</html>
