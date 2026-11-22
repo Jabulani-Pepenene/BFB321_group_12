@@ -217,7 +217,7 @@
                         </td>
 
                         <td>
-                            {% if item.expiry_date and item.expiry_date < today_date.isoformat() %}
+                            {% if item.expiry_date and item.expiry_date < today_date %}
                                 <span class="inventory-status inventory-status-danger">
                                     <span>●</span> Expired
                                 </span>

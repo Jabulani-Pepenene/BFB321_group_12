@@ -178,7 +178,7 @@
                         <td>{{ item.reorder_point }}</td>
                         <td>{{ item.expiry_date or "Not recorded" }}</td>
                         <td>
-                           {% if item.expiry_date and item.expiry_date < today_date.isoformat() %}
+                           {% if item.expiry_date and item.expiry_date < today_date %}
                                 <span class="status danger">Expired</span>
                             {% elif item.daily_usage is defined and item.daily_usage > 0 and item.quantity <= item.reorder_point %}
                                 <span class="status warning">Reorder stock</span>
