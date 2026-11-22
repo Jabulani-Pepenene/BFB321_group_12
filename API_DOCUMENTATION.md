@@ -194,3 +194,24 @@ The API can be tested using PowerShell, Postman, or another HTTP client.
 Example:
 
 Invoke-RestMethod "http://127.0.0.1:5000/api/inventory"
+
+### Automated Test Suite
+
+The project includes automated unit tests for the REST API and supply-chain calculations.
+
+To run all tests from the project root, execute:
+
+    python -m unittest discover -s tests -v
+
+The test suite currently covers:
+
+- Inventory API listing, pagination and retrieval.
+- Inventory creation, updating and deletion.
+- Input validation and invalid requests.
+- Missing inventory records and linked-record deletion restrictions.
+- Database error handling.
+- Ingredient quantity calculations and stock shortages.
+- Economic Order Quantity (EOQ) and reorder point calculations.
+- Supplier selection and missing supplier assignments.
+
+The tests use mocked database connections where appropriate, so API tests do not modify the live MySQL database.

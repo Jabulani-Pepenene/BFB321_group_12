@@ -11,9 +11,7 @@ def api_home():
         "message": "SchoolFeeding360 REST API is running",
         "version": "1.0",
         "endpoints": {
-            "inventory": "/api/inventory",
-            "suppliers": "/api/suppliers",
-            "meals": "/api/meals"
+            "inventory": "/api/inventory"
         }
     }), 200
 
