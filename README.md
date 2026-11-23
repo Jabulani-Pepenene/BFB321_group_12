@@ -97,7 +97,7 @@ Provides access to selected application resources, including inventory, meals, a
 
 Additional API information is available in `API_DOCUMENTATION.md`.
 
-## 6. Database Structure
+## 6. Database
 
 SchoolFeeding360 uses **MySQL 8** as its relational database management system.
 
@@ -105,24 +105,21 @@ The database is named:
 
 `schoolfeeding360`
 
-The database contains the following main tables:
+The database contains the following tables:
 
-| Table | Description |
-|---|---|
-| `users` | Stores application user account information. |
-| `suppliers` | Stores supplier information. |
-| `inventory` | Stores food inventory and stock information. |
-| `meal_plans` | Stores planned meals and related information. |
-| `meal_ingredients` | Stores ingredients assigned to meal plans. |
-| `stock_receipts` | Records stock received into inventory. |
-| `food_waste` | Stores recorded food waste information. |
+- `users`
+- `suppliers`
+- `inventory`
+- `meal_plans`
+- `meal_ingredients`
+- `stock_receipts`
+- `food_waste`
 
-### Database Schema File
+### Database Schema
 
-The repository includes `database_schema.sql`, which contains the database structure, including table definitions, primary keys, indexes, unique constraints, and foreign key relationships.
+The repository includes `database_schema.sql`, which contains the database structure, including table definitions, primary keys, indexes, unique constraints and foreign key relationships.
 
-The SQL file contains the database structure only. It does not contain local database records or user account data.
-
+The SQL file contains the database structure only. It does not include local database records or user account data.
 ## 7. Installation and Setup
 
 ### 7.1 Prerequisites
