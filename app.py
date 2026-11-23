@@ -1,15 +1,16 @@
-
 import os
 import re
-import sqlite3
+import mysql.connector
+from mysql.connector import IntegrityError
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from functools import wraps
-
+from api.routes import api
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
+app.register_blueprint(api)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "schoolfeeding360-local-key")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -17,24 +18,22 @@ app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "0") ==
 
 
 # --------------------------------------------------
-# SQLITE DATABASE CONNECTION
+# MYSQL DATABASE CONNECTION
 # --------------------------------------------------
 
-DATABASE_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "schoolfeeding360.db"
-)
-
-
 def get_db_connection():
-    connection = sqlite3.connect(DATABASE_PATH)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+    return mysql.connector.connect(
+        host=os.getenv("MYSQL_HOST", "localhost"),
+        user=os.getenv("MYSQL_USER", "root"),
+        password=os.getenv("MYSQL_PASSWORD", ""),
+        database=os.getenv("MYSQL_DATABASE", "schoolfeeding360"),
+        port=int(os.getenv("MYSQL_PORT", "3306")),
+        autocommit=False
+    )
 
 
 def get_cursor(connection):
-    return connection.cursor()
+    return connection.cursor(dictionary=True)
 
 
 # --------------------------------------------------
@@ -73,16 +72,20 @@ def login():
             return render_template("login.html")
 
         connection = get_db_connection()
+        cursor = get_cursor(connection)
+
         try:
-            user = connection.execute(
+            cursor.execute(
                 """
                 SELECT id, full_name, email, password_hash
                 FROM users
-                WHERE email = ?
+                WHERE email = %s
                 """,
                 (email,)
-            ).fetchone()
+            )
+            user = cursor.fetchone()
         finally:
+            cursor.close()
             connection.close()
 
         if user and check_password_hash(user["password_hash"], password):
@@ -93,8 +96,7 @@ def login():
             session["email"] = user["email"]
             return redirect(url_for("index"))
 
-        # Optional legacy administrator login.
-        # ADMIN_USERNAME must be an email address for the new login form.
+        # Optional legacy administrator login
         admin_email = os.getenv("ADMIN_USERNAME", "").strip().lower()
         admin_password = os.getenv("ADMIN_PASSWORD", "")
 
@@ -145,16 +147,19 @@ def register():
             flash("Your passwords do not match.", "error")
         else:
             connection = get_db_connection()
+            cursor = get_cursor(connection)
+
             try:
                 password_hash = generate_password_hash(password)
 
-                connection.execute(
+                cursor.execute(
                     """
                     INSERT INTO users (full_name, email, password_hash)
-                    VALUES (?, ?, ?)
+                    VALUES (%s, %s, %s)
                     """,
                     (full_name, email, password_hash)
                 )
+
                 connection.commit()
 
                 flash(
@@ -163,13 +168,15 @@ def register():
                 )
                 return redirect(url_for("login"))
 
-            except sqlite3.IntegrityError:
+            except IntegrityError:
                 connection.rollback()
                 flash(
                     "An account with that email address already exists.",
                     "error"
                 )
+
             finally:
+                cursor.close()
                 connection.close()
 
     return render_template("register.html")
@@ -187,105 +194,51 @@ def logout():
 # --------------------------------------------------
 
 def init_db():
+    """Verify that the existing MySQL database is ready."""
+
+    required_tables = {
+        "users",
+        "suppliers",
+        "inventory",
+        "meal_plans",
+        "meal_ingredients",
+        "stock_receipts",
+        "food_waste"
+    }
+
     connection = get_db_connection()
+    cursor = get_cursor(connection)
 
     try:
-        connection.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                full_name TEXT NOT NULL,
-                email TEXT NOT NULL COLLATE NOCASE UNIQUE,
-                password_hash TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS inventory (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                item_name TEXT NOT NULL,
-                category TEXT NOT NULL DEFAULT 'Other',
-                quantity NUMERIC NOT NULL DEFAULT 0,
-                unit TEXT NOT NULL DEFAULT 'kg',
-                minimum_stock NUMERIC NOT NULL DEFAULT 0,
-                expiry_date TEXT,
-                supplier_id INTEGER,
-                daily_usage NUMERIC NOT NULL DEFAULT 0,
-                operating_days INTEGER NOT NULL DEFAULT 260,
-                lead_time_days INTEGER NOT NULL DEFAULT 0,
-                safety_stock NUMERIC NOT NULL DEFAULT 0,
-                ordering_cost NUMERIC NOT NULL DEFAULT 0,
-                holding_cost NUMERIC NOT NULL DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS suppliers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                contact_person TEXT,
-                phone TEXT,
-                email TEXT,
-                food_supplied TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS meal_plans (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                meal_name TEXT NOT NULL,
-                meal_date TEXT NOT NULL,
-                servings INTEGER NOT NULL DEFAULT 1,
-                description TEXT,
-                status TEXT NOT NULL DEFAULT 'Planned'
-            );
-
-            CREATE TABLE IF NOT EXISTS food_waste (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                food_name TEXT NOT NULL,
-                quantity NUMERIC NOT NULL DEFAULT 0,
-                unit TEXT,
-                reason TEXT,
-                waste_date TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS meal_ingredients (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                meal_id INTEGER NOT NULL,
-                inventory_id INTEGER NOT NULL,
-                quantity_per_serving NUMERIC NOT NULL,
-                UNIQUE(meal_id, inventory_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS stock_receipts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                item_id INTEGER NOT NULL,
-                quantity_received NUMERIC NOT NULL,
-                supplier_id INTEGER,
-                received_date TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+        cursor.execute("""
+            SELECT TABLE_NAME
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
         """)
 
-        # Migrate existing databases that do not have the meal status column.
-        columns = connection.execute(
-            "PRAGMA table_info(meal_plans)"
-        ).fetchall()
+        existing_tables = {
+            row["TABLE_NAME"] for row in cursor.fetchall()
+        }
 
-        if not any(column["name"] == "status" for column in columns):
-            connection.execute("""
-                ALTER TABLE meal_plans
-                ADD COLUMN status TEXT NOT NULL DEFAULT 'Planned'
-            """)
+        missing_tables = required_tables - existing_tables
 
-        connection.commit()
+        if missing_tables:
+            raise RuntimeError(
+                "Missing MySQL tables: "
+                + ", ".join(sorted(missing_tables))
+            )
+
+        print("MySQL database connection successful.")
+        print("All seven application tables are available.")
+
     finally:
+        cursor.close()
         connection.close()
 
 
 def ensure_meal_planning_tables(cursor):
-    cursor.execute("PRAGMA table_info(meal_plans)")
-    columns = cursor.fetchall()
-
-    if not any(column["name"] == "status" for column in columns):
-        cursor.execute("""
-            ALTER TABLE meal_plans
-            ADD COLUMN status TEXT NOT NULL DEFAULT 'Planned'
-        """)
+    """Meal-planning tables are managed by the MySQL schema."""
+    return
 
 
 # --------------------------------------------------
@@ -355,14 +308,15 @@ def index():
         cursor.execute("""
             SELECT COUNT(*) AS total
             FROM meal_plans
-            WHERE meal_date >= ? AND status = 'Planned'
+            WHERE meal_date >= %s
+              AND status = 'Planned'
         """, (date.today().isoformat(),))
         upcoming_count = cursor.fetchone()["total"]
 
         cursor.execute("""
             SELECT COUNT(*) AS total
             FROM food_waste
-            WHERE waste_date >= date('now', '-30 days')
+            WHERE waste_date >= CURDATE() - INTERVAL 30 DAY
         """)
         recent_waste_count = cursor.fetchone()["total"]
 
@@ -377,7 +331,8 @@ def index():
         cursor.execute("""
             SELECT *
             FROM meal_plans
-            WHERE meal_date >= ? AND status = 'Planned'
+            WHERE meal_date >= %s
+              AND status = 'Planned'
             ORDER BY meal_date ASC
             LIMIT 5
         """, (date.today().isoformat(),))
@@ -387,12 +342,12 @@ def index():
             SELECT
                 i.*,
                 (i.daily_usage * i.lead_time_days + i.safety_stock)
-                    AS reorder_point
+                    AS reorderpoint
             FROM inventory i
             WHERE i.quantity <= i.minimum_stock
                OR (
                     i.expiry_date IS NOT NULL
-                    AND i.expiry_date <= date('now', '+7 days')
+                    AND i.expiry_date <= CURDATE() + INTERVAL 7 DAY
                )
             ORDER BY i.expiry_date ASC
         """)
@@ -415,20 +370,15 @@ def index():
             today_date=date.today(),
             today=date.today()
         )
+
     finally:
         cursor.close()
         connection.close()
 
 
-
-
-from decimal import Decimal, InvalidOperation
-from datetime import date
-from flask import render_template, request, redirect, url_for, flash
-
-# Keep your existing imports, app setup, login_required,
-# get_db_connection(), get_cursor(), to_decimal(), and parse_date().
-
+# --------------------------------------------------
+# INVENTORY MANAGEMENT
+# --------------------------------------------------
 
 @app.route("/inventory", methods=["GET", "POST"])
 @login_required
@@ -449,15 +399,18 @@ def inventory():
                     "Opening quantity",
                     0
                 )
+
                 minimum_stock = to_decimal(
                     request.form.get("minimum_stock"),
                     "Minimum stock",
                     0
                 )
+
                 expiry_date = parse_date(
                     request.form.get("expiry_date"),
                     "expiry date"
                 )
+
                 supplier_id = int(supplier_value) if supplier_value else None
 
                 if not item_name or not unit:
@@ -465,9 +418,10 @@ def inventory():
 
                 if supplier_id is not None:
                     cursor.execute(
-                        "SELECT id FROM suppliers WHERE id = ?",
+                        "SELECT id FROM suppliers WHERE id = %s",
                         (supplier_id,)
                     )
+
                     if cursor.fetchone() is None:
                         raise ValueError("Please select a valid supplier.")
 
@@ -476,7 +430,7 @@ def inventory():
                         item_name, category, quantity, unit,
                         minimum_stock, expiry_date, supplier_id
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (
                     item_name,
                     category,
@@ -524,7 +478,11 @@ def update_inventory_settings(item_id):
     cursor = get_cursor(connection)
 
     try:
-        cursor.execute("SELECT id FROM inventory WHERE id = ?", (item_id,))
+        cursor.execute(
+            "SELECT id FROM inventory WHERE id = %s",
+            (item_id,)
+        )
+
         if cursor.fetchone() is None:
             flash("Inventory item not found.", "error")
             return redirect(url_for("inventory"))
@@ -534,16 +492,19 @@ def update_inventory_settings(item_id):
             "Daily usage",
             0
         )
+
         safety_stock = to_decimal(
             request.form.get("safety_stock", "0"),
             "Safety stock",
             0
         )
+
         ordering_cost = to_decimal(
             request.form.get("ordering_cost", "0"),
             "Ordering cost",
             0
         )
+
         holding_cost = to_decimal(
             request.form.get("holding_cost", "0"),
             "Holding cost",
@@ -560,13 +521,13 @@ def update_inventory_settings(item_id):
 
         cursor.execute("""
             UPDATE inventory
-            SET daily_usage = ?,
-                safety_stock = ?,
-                ordering_cost = ?,
-                holding_cost = ?,
-                operating_days = ?,
-                lead_time_days = ?
-            WHERE id = ?
+            SET daily_usage = %s,
+                safety_stock = %s,
+                ordering_cost = %s,
+                holding_cost = %s,
+                operating_days = %s,
+                lead_time_days = %s
+            WHERE id = %s
         """, (
             str(daily_usage),
             str(safety_stock),
@@ -611,24 +572,33 @@ def receive_inventory(item_id):
             raise ValueError("Quantity received must be greater than zero.")
 
         cursor.execute(
-            "SELECT id FROM inventory WHERE id = ?",
+            "SELECT id FROM inventory WHERE id = %s",
             (item_id,)
         )
+
         if cursor.fetchone() is None:
             raise ValueError("Inventory item not found.")
 
-        # Store the received quantity in the inventory balance.
         cursor.execute("""
             UPDATE inventory
-            SET quantity = CAST(quantity AS NUMERIC) + ?
-            WHERE id = ?
+            SET quantity = quantity + %s
+            WHERE id = %s
         """, (str(quantity_received), item_id))
 
-        # This assumes your stock_receipts table has
-        # inventory_id and quantity_received columns.
         cursor.execute("""
-            INSERT INTO stock_receipts (inventory_id, quantity_received)
-            VALUES (?, ?)
+            INSERT INTO stock_receipts (
+    item_id,
+    quantity_received,
+    supplier_id,
+    received_date
+)
+SELECT
+    id,
+    %s,
+    supplier_id,
+    CURDATE()
+FROM inventory
+WHERE id = %s
         """, (item_id, str(quantity_received)))
 
         connection.commit()
@@ -665,7 +635,7 @@ def use_inventory(item_id):
             raise ValueError("Quantity used must be greater than zero.")
 
         cursor.execute(
-            "SELECT quantity FROM inventory WHERE id = ?",
+            "SELECT quantity FROM inventory WHERE id = %s",
             (item_id,)
         )
         item = cursor.fetchone()
@@ -682,8 +652,8 @@ def use_inventory(item_id):
 
         cursor.execute("""
             UPDATE inventory
-            SET quantity = ?
-            WHERE id = ?
+            SET quantity = %s
+            WHERE id = %s
         """, (str(new_quantity), item_id))
 
         connection.commit()
@@ -711,7 +681,7 @@ def delete_inventory(item_id):
 
     try:
         cursor.execute(
-            "SELECT id, item_name FROM inventory WHERE id = ?",
+            "SELECT id, item_name FROM inventory WHERE id = %s",
             (item_id,)
         )
         item = cursor.fetchone()
@@ -719,46 +689,55 @@ def delete_inventory(item_id):
         if item is None:
             raise ValueError("Inventory item not found.")
 
-        # Prevent deleting items that are used in meal plans.
-        # Check whether this table exists before querying it.
         cursor.execute("""
-            SELECT name FROM sqlite_master
-            WHERE type = 'table' AND name = 'meal_ingredients'
-        """)
-        meal_table_exists = cursor.fetchone() is not None
+            SELECT 1
+            FROM meal_ingredients
+            WHERE inventory_id = %s
+            LIMIT 1
+        """, (item_id,))
 
-        if meal_table_exists:
-            cursor.execute("""
-                SELECT 1 FROM meal_ingredients
-                WHERE inventory_id = ?
-                LIMIT 1
-            """, (item_id,))
+        if cursor.fetchone() is not None:
+            raise ValueError(
+                "This item is used in meal plans and cannot be deleted."
+            )
 
-            if cursor.fetchone() is not None:
-                raise ValueError(
-                    "This item is used in meal plans and cannot be deleted."
-                )
+        cursor.execute("""
+            SELECT 1
+            FROM stock_receipts
+            WHERE item_id = %s
+            LIMIT 1
+        """, (item_id,))
+
+        if cursor.fetchone() is not None:
+            raise ValueError(
+                "This item has stock receipt records and cannot be deleted."
+            )
 
         cursor.execute(
-            "DELETE FROM stock_receipts WHERE inventory_id = ?",
+            "DELETE FROM inventory WHERE id = %s",
             (item_id,)
         )
-        cursor.execute("DELETE FROM inventory WHERE id = ?", (item_id,))
 
         connection.commit()
         flash("Inventory item deleted successfully.", "success")
 
-    except (ValueError, TypeError) as error:
+    except (ValueError, TypeError, IntegrityError) as error:
         connection.rollback()
-        flash(str(error), "error")
+
+        if isinstance(error, IntegrityError):
+            flash(
+                "This inventory item is linked to other records "
+                "and cannot be deleted.",
+                "error"
+            )
+        else:
+            flash(str(error), "error")
 
     finally:
         cursor.close()
         connection.close()
 
     return redirect(url_for("inventory"))
-
-
 # --------------------------------------------------
 # SUPPLIERS
 # --------------------------------------------------
@@ -783,11 +762,15 @@ def suppliers():
                 cursor.execute("""
                     INSERT INTO suppliers
                     (name, contact_person, phone, email, food_supplied)
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s)
                 """, (
-                    name, contact_person or None, phone or None,
-                    email or None, food_supplied or None
+                    name,
+                    contact_person or None,
+                    phone or None,
+                    email or None,
+                    food_supplied or None
                 ))
+
                 connection.commit()
                 flash("Supplier added successfully.", "success")
                 return redirect(url_for("suppliers"))
@@ -795,7 +778,11 @@ def suppliers():
         cursor.execute("SELECT * FROM suppliers ORDER BY name")
         supplier_list = cursor.fetchall()
 
-        return render_template("suppliers.html", suppliers=supplier_list)
+        return render_template(
+            "suppliers.html",
+            suppliers=supplier_list
+        )
+
     finally:
         cursor.close()
         connection.close()
@@ -808,19 +795,22 @@ def delete_supplier(supplier_id):
     cursor = get_cursor(connection)
 
     try:
-        ensure_meal_planning_tables(cursor)
-
         cursor.execute("""
-            UPDATE inventory SET supplier_id = NULL
-            WHERE supplier_id = ?
+            UPDATE inventory
+            SET supplier_id = NULL
+            WHERE supplier_id = %s
         """, (supplier_id,))
 
         cursor.execute("""
-            UPDATE stock_receipts SET supplier_id = NULL
-            WHERE supplier_id = ?
+            UPDATE stock_receipts
+            SET supplier_id = NULL
+            WHERE supplier_id = %s
         """, (supplier_id,))
 
-        cursor.execute("DELETE FROM suppliers WHERE id = ?", (supplier_id,))
+        cursor.execute(
+            "DELETE FROM suppliers WHERE id = %s",
+            (supplier_id,)
+        )
 
         if cursor.rowcount:
             connection.commit()
@@ -847,15 +837,15 @@ def meals():
     cursor = get_cursor(connection)
 
     try:
-        ensure_meal_planning_tables(cursor)
-
         if request.method == "POST":
             meal_name = request.form.get("meal_name", "").strip()
+
             meal_date = parse_date(
                 request.form.get("meal_date"),
                 "meal date",
                 required=True
             )
+
             servings = int(request.form.get("servings", "0"))
             description = request.form.get("description", "").strip()
 
@@ -868,7 +858,7 @@ def meals():
             cursor.execute("""
                 INSERT INTO meal_plans
                     (meal_name, meal_date, servings, description, status)
-                VALUES (?, ?, ?, ?, 'Planned')
+                VALUES (%s, %s, %s, %s, 'Planned')
             """, (
                 meal_name,
                 meal_date.isoformat(),
@@ -884,7 +874,8 @@ def meals():
         inventory_items = [dict(row) for row in cursor.fetchall()]
 
         cursor.execute("""
-            SELECT * FROM meal_plans
+            SELECT *
+            FROM meal_plans
             ORDER BY meal_date DESC, id DESC
         """)
         meal_list = [dict(row) for row in cursor.fetchall()]
@@ -898,10 +889,10 @@ def meals():
                     i.item_name,
                     i.unit,
                     i.quantity AS stock_available,
-                    (mi.quantity_per_serving * ?) AS total_required
+                    (mi.quantity_per_serving * %s) AS total_required
                 FROM meal_ingredients mi
                 JOIN inventory i ON i.id = mi.inventory_id
-                WHERE mi.meal_id = ?
+                WHERE mi.meal_id = %s
                 ORDER BY i.item_name
             """, (meal["servings"], meal["id"]))
 
@@ -917,6 +908,7 @@ def meals():
 
             meal["ingredients"] = ingredients
             meal["has_ingredients"] = bool(ingredients)
+
             meal["has_sufficient_stock"] = (
                 bool(ingredients)
                 and all(item["sufficient"] for item in ingredients)
@@ -948,9 +940,9 @@ def add_meal_ingredient(meal_id):
     cursor = get_cursor(connection)
 
     try:
-        ensure_meal_planning_tables(cursor)
-
-        inventory_id = int(request.form.get("inventory_id", "0"))
+        inventory_id = int(
+            request.form.get("inventory_id", "0")
+        )
 
         quantity_per_serving = to_decimal(
             request.form.get("quantity_per_serving"),
@@ -959,7 +951,7 @@ def add_meal_ingredient(meal_id):
         )
 
         cursor.execute(
-            "SELECT status FROM meal_plans WHERE id = ?",
+            "SELECT status FROM meal_plans WHERE id = %s",
             (meal_id,)
         )
         meal = cursor.fetchone()
@@ -973,22 +965,19 @@ def add_meal_ingredient(meal_id):
             )
 
         cursor.execute(
-            "SELECT id FROM inventory WHERE id = ?",
+            "SELECT id FROM inventory WHERE id = %s",
             (inventory_id,)
         )
 
         if cursor.fetchone() is None:
             raise ValueError("Select a valid inventory item.")
 
-        # SQLite does not support Python Decimal objects directly.
-        # Store the decimal as a string to preserve its precision.
         cursor.execute("""
             INSERT INTO meal_ingredients
                 (meal_id, inventory_id, quantity_per_serving)
-            VALUES (?, ?, ?)
-            ON CONFLICT(meal_id, inventory_id)
-            DO UPDATE SET
-                quantity_per_serving = excluded.quantity_per_serving
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                quantity_per_serving = VALUES(quantity_per_serving)
         """, (
             meal_id,
             inventory_id,
@@ -1019,13 +1008,11 @@ def delete_meal_ingredient(ingredient_id):
     cursor = get_cursor(connection)
 
     try:
-        ensure_meal_planning_tables(cursor)
-
         cursor.execute("""
             SELECT mi.id, mi.meal_id, mp.status
             FROM meal_ingredients mi
             JOIN meal_plans mp ON mp.id = mi.meal_id
-            WHERE mi.id = ?
+            WHERE mi.id = %s
         """, (ingredient_id,))
 
         ingredient = cursor.fetchone()
@@ -1041,9 +1028,10 @@ def delete_meal_ingredient(ingredient_id):
 
         else:
             cursor.execute(
-                "DELETE FROM meal_ingredients WHERE id = ?",
+                "DELETE FROM meal_ingredients WHERE id = %s",
                 (ingredient_id,)
             )
+
             connection.commit()
             flash("Ingredient removed.", "success")
 
@@ -1061,14 +1049,13 @@ def serve_meal(meal_id):
     cursor = get_cursor(connection)
 
     try:
-        ensure_meal_planning_tables(cursor)
-        connection.commit()
-        connection.execute("BEGIN IMMEDIATE")
+        connection.start_transaction()
 
         cursor.execute("""
             SELECT id, servings, status
             FROM meal_plans
-            WHERE id = ?
+            WHERE id = %s
+            FOR UPDATE
         """, (meal_id,))
 
         meal = cursor.fetchone()
@@ -1087,7 +1074,8 @@ def serve_meal(meal_id):
                 i.quantity AS stock_available
             FROM meal_ingredients mi
             JOIN inventory i ON i.id = mi.inventory_id
-            WHERE mi.meal_id = ?
+            WHERE mi.meal_id = %s
+            FOR UPDATE
         """, (meal_id,))
 
         ingredients = cursor.fetchall()
@@ -1097,7 +1085,7 @@ def serve_meal(meal_id):
                 "Add ingredients before serving this meal."
             )
 
-        # Validate every ingredient before changing any stock.
+        # Validate all ingredient stock before deducting.
         for ingredient in ingredients:
             required = (
                 Decimal(str(ingredient["quantity_per_serving"]))
@@ -1114,30 +1102,30 @@ def serve_meal(meal_id):
                     f"Required: {required}; available: {available}."
                 )
 
-        # Deduct stock only after all ingredients pass validation.
+        # Deduct stock after every ingredient passes validation.
         for ingredient in ingredients:
             required = (
                 Decimal(str(ingredient["quantity_per_serving"]))
                 * Decimal(str(meal["servings"]))
             )
 
-            # Convert Decimal to a SQLite-compatible numeric value.
             cursor.execute("""
                 UPDATE inventory
-                SET quantity = quantity - ?
-                WHERE id = ?
+                SET quantity = quantity - %s
+                WHERE id = %s
             """, (
-                float(required),
+                str(required),
                 ingredient["inventory_id"]
             ))
 
         cursor.execute("""
             UPDATE meal_plans
             SET status = 'Served'
-            WHERE id = ?
+            WHERE id = %s
         """, (meal_id,))
 
         connection.commit()
+
         flash(
             "Meal marked as served and stock deducted.",
             "success"
@@ -1161,10 +1149,8 @@ def delete_meal(meal_id):
     cursor = get_cursor(connection)
 
     try:
-        ensure_meal_planning_tables(cursor)
-
         cursor.execute(
-            "SELECT status FROM meal_plans WHERE id = ?",
+            "SELECT status FROM meal_plans WHERE id = %s",
             (meal_id,)
         )
 
@@ -1178,12 +1164,12 @@ def delete_meal(meal_id):
 
         else:
             cursor.execute(
-                "DELETE FROM meal_ingredients WHERE meal_id = ?",
+                "DELETE FROM meal_ingredients WHERE meal_id = %s",
                 (meal_id,)
             )
 
             cursor.execute(
-                "DELETE FROM meal_plans WHERE id = ?",
+                "DELETE FROM meal_plans WHERE id = %s",
                 (meal_id,)
             )
 
@@ -1195,11 +1181,8 @@ def delete_meal(meal_id):
         connection.close()
 
     return redirect(url_for("meals"))
-
-
-
 # --------------------------------------------------
-# FOOD WASTE
+# FOOD WASTE MANAGEMENT
 # --------------------------------------------------
 
 @app.route("/waste", methods=["GET", "POST"])
@@ -1234,7 +1217,9 @@ def waste():
                     raise ValueError("Please enter the unit.")
 
                 if reason not in allowed_reasons:
-                    raise ValueError("Please select a valid reason for the waste.")
+                    raise ValueError(
+                        "Please select a valid reason for the waste."
+                    )
 
                 try:
                     quantity = Decimal(quantity_text)
@@ -1242,7 +1227,9 @@ def waste():
                     raise ValueError("Please enter a valid quantity.")
 
                 if not quantity.is_finite() or quantity <= 0:
-                    raise ValueError("Quantity must be greater than zero.")
+                    raise ValueError(
+                        "Quantity must be greater than zero."
+                    )
 
                 try:
                     parsed_date = date.fromisoformat(waste_date_text)
@@ -1250,40 +1237,40 @@ def waste():
                     raise ValueError("Please enter a valid waste date.")
 
                 if parsed_date > date.today():
-                    raise ValueError("Waste date cannot be in the future.")
+                    raise ValueError(
+                        "Waste date cannot be in the future."
+                    )
 
-                cursor.execute(
-                    """
+                cursor.execute("""
                     INSERT INTO food_waste
                         (food_name, quantity, unit, reason, waste_date)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        food_name,
-                        str(quantity),
-                        unit,
-                        reason,
-                        parsed_date.isoformat(),
-                    ),
-                )
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    food_name,
+                    str(quantity),
+                    unit,
+                    reason,
+                    parsed_date.isoformat(),
+                ))
 
                 connection.commit()
-                flash("Food waste record saved successfully.", "success")
+
+                flash(
+                    "Food waste record saved successfully.",
+                    "success"
+                )
                 return redirect(url_for("waste"))
 
             except ValueError as error:
                 connection.rollback()
                 flash(str(error), "error")
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT id, food_name, quantity, unit, reason, waste_date
             FROM food_waste
             ORDER BY waste_date DESC, id DESC
-            """
-        )
+        """)
 
-        # Convert sqlite3.Row objects to dictionaries.
         records = [dict(row) for row in cursor.fetchall()]
 
         return render_template(
@@ -1294,8 +1281,16 @@ def waste():
 
     except Exception:
         connection.rollback()
-        app.logger.exception("Error loading Food Waste Management.")
-        flash("Unable to load food waste records. Check the application log.", "error")
+        app.logger.exception(
+            "Error loading Food Waste Management."
+        )
+
+        flash(
+            "Unable to load food waste records. "
+            "Check the application log.",
+            "error"
+        )
+
         return render_template(
             "waste.html",
             records=[],
@@ -1315,8 +1310,8 @@ def delete_waste(record_id):
 
     try:
         cursor.execute(
-            "SELECT id FROM food_waste WHERE id = ?",
-            (record_id,),
+            "SELECT id FROM food_waste WHERE id = %s",
+            (record_id,)
         )
 
         if cursor.fetchone() is None:
@@ -1324,24 +1319,31 @@ def delete_waste(record_id):
             return redirect(url_for("waste"))
 
         cursor.execute(
-            "DELETE FROM food_waste WHERE id = ?",
-            (record_id,),
+            "DELETE FROM food_waste WHERE id = %s",
+            (record_id,)
         )
 
         connection.commit()
-        flash("Food waste record deleted successfully.", "success")
+
+        flash(
+            "Food waste record deleted successfully.",
+            "success"
+        )
 
     except Exception:
         connection.rollback()
         app.logger.exception("Error deleting food waste record.")
-        flash("Unable to delete the food waste record.", "error")
+
+        flash(
+            "Unable to delete the food waste record.",
+            "error"
+        )
 
     finally:
         cursor.close()
         connection.close()
 
     return redirect(url_for("waste"))
-
 
 
 # --------------------------------------------------
