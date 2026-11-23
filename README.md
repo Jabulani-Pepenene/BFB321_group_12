@@ -164,7 +164,7 @@ Activate the environment in PowerShell:
 python -m pip install -r requirements.txt
 ```
 
-### 7.5 Configure MySQL
+### Configure MySQL
 
 Ensure that MySQL Server 8 is installed and running.
 
@@ -178,7 +178,7 @@ Enter your MySQL root password when prompted.
 
 **Step 2: Import the database structure**
 
-From the project root directory, execute:
+From the project root directory, run:
 
 ```powershell
 mysql -u root -p schoolfeeding360 < database_schema.sql
@@ -186,30 +186,28 @@ mysql -u root -p schoolfeeding360 < database_schema.sql
 
 Enter your MySQL root password when prompted.
 
-This imports the database structure required by the application. The database will initially contain no application records.
+This imports the seven database tables required by the application. The database will initially contain no application records.
 
-**Important:** Import this schema into a newly created, empty database. The SQL file contains `DROP TABLE IF EXISTS` statements and should not be imported into an existing database containing data you want to preserve.
+**Important:** Import this schema into a newly created, empty database. The SQL file contains `DROP TABLE IF EXISTS` statements and should not be imported into an existing database containing information you want to preserve.
 
 **Step 3: Configure the database connection**
 
 The application uses the following environment variables:
 
-| Variable | Description | Default |
-|---|---|---|
-| `MYSQL_HOST` | MySQL server address | `localhost` |
-| `MYSQL_USER` | MySQL username | `root` |
-| `MYSQL_PASSWORD` | MySQL password | No default |
-| `MYSQL_DATABASE` | Application database name | `schoolfeeding360` |
-| `MYSQL_PORT` | MySQL server port | `3306` |
+| Variable | Default |
+|---|---|
+| `MYSQL_HOST` | `localhost` |
+| `MYSQL_USER` | `root` |
+| `MYSQL_PASSWORD` | Your MySQL password |
+| `MYSQL_DATABASE` | `schoolfeeding360` |
+| `MYSQL_PORT` | `3306` |
 
-For the current PowerShell session, set the password securely:
+In PowerShell, set your MySQL password for the current session:
 
 ```powershell
 $secure = Read-Host "Enter your MySQL root password" -AsSecureString
 $env:MYSQL_PASSWORD = [System.Net.NetworkCredential]::new("", $secure).Password
-```
-
-Set other connection variables only if your MySQL configuration differs from the defaults.
+```.
 
 ## 8. Running the Application
 
