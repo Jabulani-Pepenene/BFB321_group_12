@@ -232,7 +232,7 @@ The API includes endpoints for:
 
 When the application is running, the API can be accessed locally through:
 
-`http://127.0.0.1:5000/api/`
+`http://127.0.0.1:5000`
 
 ## 10. Running Tests
 
