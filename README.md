@@ -1,79 +1,284 @@
-# BFB321_group_12 — Semester Web Application Project
+# BFB321 Group 12 – SchoolFeeding360
 
-## Project Title
-**SchoolFeeding360 Web Application**
+## 1. Project Overview
 
-## Project Description
-SchoolFeeding360 is a Flask-based web application designed to streamline school feeding programme management through inventory tracking, supplier management, meal planning, food waste monitoring, and alerts. It helps improve food resource management, reduce waste, and support efficient school meal operations through a professional, user-friendly interface.
+**SchoolFeeding360** is a web-based school feeding and supply chain management system developed for the BFB321 – Supply Chain Technologies and Project module.
 
-## Group Members
+The system provides a centralized platform for monitoring food inventory, managing suppliers, planning meals, tracking food waste, and supporting inventory-related decisions.
 
-| Initials | Full Name | Student Number |
+It aims to improve stock visibility, reduce food wastage, support efficient resource allocation, and help schools plan and manage their feeding operations.
+
+## 2. Project Objectives
+
+The main objectives of SchoolFeeding360 are to:
+
+- Improve inventory tracking and stock management.
+- Monitor stock levels and identify items requiring replenishment.
+- Manage supplier information.
+- Support meal planning based on available inventory.
+- Track food waste and identify opportunities to reduce wastage.
+- Apply supply chain techniques to support inventory decisions.
+- Provide a centralized web-based platform for school feeding operations.
+
+## 3. Group Members
+
+| Initials | Group Member | Student Number |
 |---|---|---|
 | JK | Jabulani Pepenene | u22678192 |
 | OC | Oreneile Samane | u23652382 |
 | F | Faith Baloyi | u23928892 |
 | MW | Michal Potgieter | u24679047 |
 
-## Technologies Used
+## 4. Technologies Used
 
-- **Programming languages:** Python, HTML, CSS, JavaScript
-- **Framework:** Flask
-- **Database:** SQLite
-- **Other tools:** Jinja2, Visual Studio Code, Git, GitHub
+| Technology | Purpose |
+|---|---|
+| Python | Main programming language |
+| Flask | Web application framework |
+| MySQL 8 | Relational database management |
+| MySQL Connector/Python | Communication between Python and MySQL |
+| HTML5 | Web page structure |
+| CSS3 | Styling and layout |
+| JavaScript | Client-side functionality |
+| Jinja2 | Dynamic HTML templating |
+| Git | Version control |
+| GitHub | Source code hosting and collaboration |
+| Visual Studio Code | Development environment |
 
-## Installation and Setup
+## 5. Main System Features
 
-1. Clone the repository:
+### 5.1 Dashboard
 
-   ```bash
-   git clone https://github.com/Jabulani-Pepenene/BFB321_group_12.git
-   ```
+Provides an overview of school feeding and inventory operations, including inventory levels, suppliers, meal plans, and food waste.
 
-2. Navigate to the project folder:
+### 5.2 Inventory Management
 
-   ```bash
-   cd BFB321_group_12
-   ```
+Allows users to:
 
-3. Create a virtual environment:
+- Add and manage food inventory items.
+- View available stock quantities.
+- Set minimum stock levels.
+- Monitor low-stock items.
+- Record stock received.
+- Record stock usage.
+- Manage inventory information.
 
-   ```bash
-   python -m venv .venv
-   ```
+### 5.3 Supplier Management
 
-4. Activate the virtual environment on Windows PowerShell:
+Provides functionality for adding, viewing, and managing supplier records and linking inventory items to suppliers.
 
-   ```powershell
-   .\.venv\Scripts\Activate.ps1
-   ```
+### 5.4 Meal Planning
 
-5. Install the required dependencies:
+Allows users to:
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+- Create meal plans.
+- Specify meal dates and serving quantities.
+- Add inventory ingredients to meals.
+- Calculate total ingredient quantities required.
+- Check whether sufficient stock is available.
+- Monitor meal planning status.
 
-## Running the Application
+### 5.5 Food Waste Management
 
-Start the application:
+Supports the recording and monitoring of food waste to help identify wastage and improve resource utilization.
 
-```bash
+### 5.6 Supply Chain Decision Support
+
+Incorporates supply chain decision-support calculations, including:
+
+- Economic Order Quantity (EOQ).
+- Reorder Point calculations.
+- Inventory usage analysis.
+- Stock replenishment support.
+
+### 5.7 REST API
+
+Provides access to selected application resources, including inventory, meals, and suppliers.
+
+Additional API information is available in `API_DOCUMENTATION.md`.
+
+## 6. Database Structure
+
+SchoolFeeding360 uses **MySQL 8** as its relational database management system.
+
+The database is named:
+
+`schoolfeeding360`
+
+The database contains the following main tables:
+
+| Table | Description |
+|---|---|
+| `users` | Stores application user account information. |
+| `suppliers` | Stores supplier information. |
+| `inventory` | Stores food inventory and stock information. |
+| `meal_plans` | Stores planned meals and related information. |
+| `meal_ingredients` | Stores ingredients assigned to meal plans. |
+| `stock_receipts` | Records stock received into inventory. |
+| `food_waste` | Stores recorded food waste information. |
+
+### Database Schema File
+
+The repository includes `database_schema.sql`, which contains the database structure, including table definitions, primary keys, indexes, unique constraints, and foreign key relationships.
+
+The SQL file contains the database structure only. It does not contain local database records or user account data.
+
+## 7. Installation and Setup
+
+### 7.1 Prerequisites
+
+Ensure that the following software is installed:
+
+- Python 3.10 or later.
+- MySQL Server 8.
+- MySQL command-line client.
+- Git.
+- Visual Studio Code (recommended).
+
+### 7.2 Clone the Repository
+
+Open a terminal and run:
+
+```powershell
+git clone https://github.com/Jabulani-Pepenene/BFB321_group_12.git
+```
+
+Navigate into the project directory:
+
+```powershell
+cd BFB321_group_12
+```
+
+### 7.3 Create a Virtual Environment
+
+```powershell
+python -m venv .venv
+```
+
+Activate the environment in PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+### 7.4 Install Dependencies
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+### 7.5 Configure MySQL
+
+Ensure that MySQL Server 8 is installed and running.
+
+**Step 1: Create the application database**
+
+```powershell
+mysql -u root -p -e "CREATE DATABASE schoolfeeding360 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+Enter your MySQL root password when prompted.
+
+**Step 2: Import the database structure**
+
+From the project root directory, execute:
+
+```powershell
+mysql -u root -p schoolfeeding360 < database_schema.sql
+```
+
+Enter your MySQL root password when prompted.
+
+This imports the database structure required by the application. The database will initially contain no application records.
+
+**Important:** Import this schema into a newly created, empty database. The SQL file contains `DROP TABLE IF EXISTS` statements and should not be imported into an existing database containing data you want to preserve.
+
+**Step 3: Configure the database connection**
+
+The application uses the following environment variables:
+
+| Variable | Description | Default |
+|---|---|---|
+| `MYSQL_HOST` | MySQL server address | `localhost` |
+| `MYSQL_USER` | MySQL username | `root` |
+| `MYSQL_PASSWORD` | MySQL password | No default |
+| `MYSQL_DATABASE` | Application database name | `schoolfeeding360` |
+| `MYSQL_PORT` | MySQL server port | `3306` |
+
+For the current PowerShell session, set the password securely:
+
+```powershell
+$secure = Read-Host "Enter your MySQL root password" -AsSecureString
+$env:MYSQL_PASSWORD = [System.Net.NetworkCredential]::new("", $secure).Password
+```
+
+Set other connection variables only if your MySQL configuration differs from the defaults.
+
+## 8. Running the Application
+
+After completing the installation and database configuration, ensure that the virtual environment is activated and run:
+
+```powershell
 python app.py
 ```
 
-Open your browser and visit:
+When the Flask development server starts successfully, open the following address in your web browser:
 
-`http://127.0.0.1:5000`
+**http://127.0.0.1:5000**
 
-## Main Features
+To stop the development server, press `CTRL + C` in the terminal.
 
-- Food inventory and stock tracking
-- Supplier management
-- Meal planning
-- Food waste monitoring
-- Alerts for improved food resource management
+## 9. API Documentation
 
-## Group Submission
+The project includes API endpoints for accessing application resources.
 
-This repository contains the BFB321_group_12 Semester Web Application Project, SchoolFeeding360.
+The API documentation is available in:
+
+`API_DOCUMENTATION.md`
+
+The API includes endpoints for:
+
+- Inventory management.
+- Meal management.
+- Supplier management.
+
+When the application is running, the API can be accessed locally through:
+
+`http://127.0.0.1:5000/api/`
+
+## 10. Running Tests
+
+The project includes automated tests for selected application and supply chain functionality.
+
+To run the tests, activate the virtual environment and execute:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+The test suite covers selected functionality such as:
+
+- Ingredient quantity calculations.
+- Stock shortage identification.
+- Meal serving validation.
+- Economic Order Quantity calculations.
+- Reorder Point calculations.
+- Inventory-related decision-support logic.
+
+## 11. Project Repository
+
+**GitHub Repository:**
+
+https://github.com/Jabulani-Pepenene/BFB321_group_12
+
+## 12. Conclusion
+
+SchoolFeeding360 demonstrates how web technologies and supply chain management principles can be combined to improve the management of school feeding operations.
+
+By integrating inventory management, supplier management, meal planning, food waste tracking, and supply chain decision-support calculations into one platform, the system aims to support better planning, improved stock control, and more efficient use of resources within school feeding programmes.
+
+**Module:** BFB321 – Supply Chain Technologies and Project
+
+**Group:** Group 12
+
+**Project:** SchoolFeeding360
