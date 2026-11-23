@@ -164,8 +164,6 @@ Activate the environment in PowerShell:
 python -m pip install -r requirements.txt
 ```
 
-### Configure MySQL
-
 Ensure that MySQL Server 8 is installed and running.
 
 **Step 1: Create the application database**
@@ -173,8 +171,6 @@ Ensure that MySQL Server 8 is installed and running.
 ```powershell
 mysql -u root -p -e "CREATE DATABASE schoolfeeding360 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 ```
-
-Enter your MySQL root password when prompted.
 
 **Step 2: Import the database structure**
 
@@ -184,12 +180,9 @@ From the project root directory, run:
 mysql -u root -p schoolfeeding360 < database_schema.sql
 ```
 
-Enter your MySQL root password when prompted.
+This imports the seven database tables required by the application. The SQL file contains the database structure only, not application records.
 
-This imports the seven database tables required by the application. The database will initially contain no application records.
-
-**Important:** Import this schema into a newly created, empty database. The SQL file contains `DROP TABLE IF EXISTS` statements and should not be imported into an existing database containing information you want to preserve.
-
+**Important:** Import this schema into a newly created, empty database. It contains `DROP TABLE IF EXISTS` statements and should not be imported into a database containing data you want to preserve.
 **Step 3: Configure the database connection**
 
 The application uses the following environment variables:
